@@ -80,9 +80,9 @@ LRESULT CALLBACK MessageProc(HWND wnd, UINT msg, WPARAM wParam, LPARAM lParam)
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
 {
     // Register our window class
-    WNDCLASSEX wcex = { sizeof(WNDCLASSEX), CS_CLASSDC|CS_DBLCLKS, MessageProc, 0L, 0L, 
-                        instance, NULL, NULL, NULL, NULL, WINDOW_CLASS_NAME, NULL };
-    RegisterClassEx(&wcex);
+    WNDCLASSEXA m_WndClass = { sizeof(WNDCLASSEXA), CS_CLASSDC, MessageProc, 0L, 0L, GetModuleHandleA(0), 0, 0, 0, 0, WINDOW_CLASS_NAME, 0 };
+    m_WndClass.hIcon = LoadIconA(instance, MAKEINTRESOURCEA(IDI_ICON1));
+    RegisterClassExA(&m_WndClass);
 
     // Create a window
     const int W = 640;
@@ -94,6 +94,8 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
     HWND wnd = CreateWindow(WINDOW_CLASS_NAME, "Scarface: The World Is Yours - DirectX9 ToolKit", 
                         style, CW_USEDEFAULT, CW_USEDEFAULT, 
                         rect.right-rect.left, rect.bottom-rect.top, NULL, NULL, instance, NULL);
+
+ 
     if( !wnd )
     {
         DWORD errorCode = GetLastError();
@@ -115,6 +117,7 @@ int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow)
         // Free the buffer allocated by FormatMessage
         LocalFree(errorMsgBuffer);
     }
+
     ShowWindow(wnd, cmdShow);
     UpdateWindow(wnd);
 

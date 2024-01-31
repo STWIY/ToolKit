@@ -8,7 +8,20 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/lib)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
-add_executable(ToolKit WinMain.cpp WinMain.h ToolKitUI.cpp ToolKitUI.h)
+enable_language("RC")
+set (WIN32_RESOURCES ${CMAKE_CURRENT_SOURCE_DIR}/resources/toolkit.rc)
+
+# Set the source files for the project
+set(SOURCES
+    WinMain.cpp
+    WinMain.h
+    ToolKitUI.cpp
+    ToolKitUI.h
+    resource.h
+    ${WIN32_RESOURCES}
+)
+
+add_executable(ToolKit WIN32 ${SOURCES})
 
 # Set the Windows SDK version
 set(CMAKE_SYSTEM_VERSION 10.0 CACHE STRING "" FORCE)

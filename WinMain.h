@@ -3,6 +3,8 @@
 #include <Windows.h>
 #include <d3d9.h>
 
+#include "resource.h"
+
 // Direct3D structures
 extern IDirect3D9 *            g_D3D;
 extern IDirect3DDevice9 *      g_D3DDev;
