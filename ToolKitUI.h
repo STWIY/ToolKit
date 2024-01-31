@@ -21,6 +21,7 @@ namespace ui
 		void EndRender();
 		void Shutdown();
 		void ApplyTheme();
+		void Render();
 	};
 
 	inline ToolKitUI g_UI;

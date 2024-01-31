@@ -1,9 +1,15 @@
 
 #include "ToolKitUI.h"
 #include "WinMain.h"
+#include <mutex>
 
 namespace ui
 {
+    const char* m_Explorer = "Explorer";
+    const char* m_PropertiesTitle = "Properties";
+    const char* m_HexEditorTitle = "Hex Editor";
+    static ImGuiID g_DockspaceID = 0;
+
     void ToolKitUI::Initialize(HWND wnd)
 	{
         this->wnd = wnd;
@@ -27,17 +33,8 @@ namespace ui
         ImGui_ImplDX9_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-
-        // 1. Show simple menu.
-        {
-            ImGui::Begin("The Hello, world is yours!");
-
-            ImGui::Text("Scarface: The World Is Yours - ToolKit");
- 
-            ImGui::End();
-        }
+        this->Render();
         ImGui::EndFrame();
-
         ImGui::Render();
         ImGui_ImplDX9_RenderDrawData(ImGui::GetDrawData());
 	}
@@ -87,4 +84,90 @@ namespace ui
             m_Style.ScrollbarRounding = 0.f;
         }
 	}
+ImGuiID dockId;
+    void ToolKitUI::Render()
+    {
+        bool canNotFocusMain = false;
+
+        ImVec2 wndSize = ImGui::GetIO().DisplaySize;
+        ImVec2 wndPadding =  ImGui::GetStyle().WindowPadding;
+
+        ImGui::SetNextWindowSize(wndSize);
+        ImGui::SetNextWindowPos({ 0, 0 });
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+        
+        if(ImGui::Begin("##main_view", 0, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus))
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, wndPadding);
+
+            ImGuiID dockspace_id = ImGui::GetID("##main_dockspace");
+
+            static std::once_flag calledBuilderFlag;
+
+            std::call_once(calledBuilderFlag, [&]() {
+                ImGui::DockBuilderRemoveNode(dockspace_id); // Clear out existing layout
+                ImGui::DockBuilderAddNode(dockspace_id); // Add empty node
+
+                ImGui::DockBuilderDockWindow(m_Explorer, ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_Left, 0.45f, nullptr, nullptr));
+
+                ImGuiID m_PropertiesID = ImGui::DockBuilderSplitNode(dockspace_id, ImGuiDir_None, 0.f, nullptr, nullptr);
+                ImGui::DockBuilderDockWindow(m_PropertiesTitle, m_PropertiesID);
+                ImGui::DockBuilderDockWindow(m_HexEditorTitle, ImGui::DockBuilderSplitNode(m_PropertiesID, ImGuiDir_Down, 0.45f, nullptr, nullptr));
+
+            });
+
+            ImGui::DockSpace(dockspace_id);
+
+            // Add a menu bar
+            if (ImGui::BeginMainMenuBar())
+            {
+                if (ImGui::BeginMenu("File"))
+                {
+                    // Add menu items here
+                    if (ImGui::MenuItem("Open"))
+                    {
+                        // Handle "Open" action
+                    }
+                    if (ImGui::MenuItem("Save"))
+                    {
+                        // Handle "Save" action
+                    }
+                    if (ImGui::MenuItem("Exit"))
+                    {
+                        // Handle "Exit" action
+                    }
+
+                    ImGui::EndMenu();
+                }
+
+                // Add more menu items here if needed
+
+                ImGui::EndMainMenuBar();
+            }
+
+            if(ImGui::Begin(m_Explorer))
+            {
+                
+            }
+            ImGui::End();
+
+            if(ImGui::Begin(m_PropertiesTitle))
+            {
+
+            }
+            ImGui::End();
+
+            if(ImGui::Begin(m_HexEditorTitle))
+            {
+
+            }
+            ImGui::End();
+
+
+            ImGui::PopStyleVar();
+        
+        }
+        ImGui::End();
+        ImGui::PopStyleVar();
+    }
 }
