@@ -1,6 +1,6 @@
 # ToolKit
 
-ToolKit is a Win32 application developed using DirectX and ImGui libraries. It provides a user-friendly interface for viewing and editing files related to the game Scarface: The World Is Yours.
+ToolKit is a Win32 application developed using DirectX 11 and ImGui libraries. It provides a user-friendly interface for viewing and editing files related to the game Scarface: The World Is Yours.
 
 ## Features
 
@@ -23,8 +23,8 @@ ToolKit is a Win32 application developed using DirectX and ImGui libraries. It p
    ```bash
    git clone https://github.com/STWIY/ToolKit.git
    
-2. Open the project in Visual Studio.
-3. Build the project using the provided CMake configuration.
+2. Open the project solution in Visual Studio.
+3. Build the project.
  
 ## Contributing
 

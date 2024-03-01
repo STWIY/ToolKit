@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Project Files">
+      <UniqueIdentifier>{d50fb932-8c3d-43dc-8f25-9528aec25db5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\3rdParty">
+      <UniqueIdentifier>{0ea7a4c9-e33d-4bdd-9dd1-660975cf3ee5}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="winmain.cc">
+      <Filter>Project Files</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdParty\ImGui\imgui.cpp">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdParty\ImGui\imgui_draw.cpp">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdParty\ImGui\imgui_impl_dx11.cpp">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdParty\ImGui\imgui_impl_win32.cpp">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdParty\ImGui\imgui_tables.cpp">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClCompile>
+    <ClCompile Include="3rdParty\ImGui\imgui_widgets.cpp">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="winmain.h">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="3rdParty\ImGui\imconfig.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imgui.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imgui_impl_dx11.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imgui_impl_win32.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imgui_internal.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imgui_memory_editor.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imstb_rectpack.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imstb_textedit.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+    <ClInclude Include="3rdParty\ImGui\imstb_truetype.h">
+      <Filter>Project Files\3rdParty</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ToolKit.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="icon1.ico" />
+  </ItemGroup>
+</Project>
