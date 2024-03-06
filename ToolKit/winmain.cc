@@ -79,6 +79,21 @@ namespace Render
             }
         }
 
+        // Options
+        if (m_OpenFile)
+        {
+                // Example usage
+            std::string filePath = OpenFileDlg();
+            if (!filePath.empty()) {
+                // File selected, process it
+                ProcessFile(std::wstring(filePath.begin(), filePath.end()));
+            }
+            else {
+                // No file selected or dialog canceled
+                std::cout << "No file selected or dialog canceled." << std::endl;
+            }
+        }
+
         ImGui::End();
     }
 
@@ -187,6 +202,17 @@ namespace ImGui
     void InitializeFonts()
     {
         g_ImGuiIO->Fonts->AddFontDefault();
+
+        // FontAwesome
+        {
+            ImFontConfig m_FontConfig;
+            m_FontConfig.MergeMode = true;
+            m_FontConfig.OversampleH = 1;
+            m_FontConfig.GlyphOffset.y += 1.f;
+            m_FontConfig.PixelSnapH = true;
+            static const ImWchar m_GlyphRange[] = { 0xE000, 0xF8FF, 0 };
+            g_ImGuiIO->Fonts->AddFontFromMemoryCompressedTTF(Resource::FontAwesome_compressed_data, Resource::FontAwesome_compressed_size, 12.f, &m_FontConfig, m_GlyphRange);
+        }
     }
 
     void ApplyCustomStyle()

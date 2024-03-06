@@ -63,6 +63,19 @@
     <ClInclude Include="3rdParty\ImGui\imstb_truetype.h">
       <Filter>Project Files\3rdParty</Filter>
     </ClInclude>
+    <ClInclude Include="FontAwesome.hxx" />
+    <ClInclude Include="FileHandler.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="RCF.h">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Helpers.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FileReader.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ToolKit.rc" />

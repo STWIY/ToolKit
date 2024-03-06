@@ -18,11 +18,19 @@
 #include <d3d11.h>
 #pragma comment(lib, "d3d11")
 
+// Helpers
+#include "Helpers.hxx"
+
+// File handler
+#include "FileHandler.hxx"
+extern FileHandler* g_FileHandler;
+
 // Defines
 #define PROJECT_NAME        "Scarface Tool"
 
 // Resources
 #include "resource.h"
+#include "FontAwesome.hxx"
 
 // 3rdParty (ImGui)
 #include "3rdParty/ImGui/imgui.h"

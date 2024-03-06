@@ -160,6 +160,11 @@
     <ClInclude Include="3rdParty\ImGui\imstb_rectpack.h" />
     <ClInclude Include="3rdParty\ImGui\imstb_textedit.h" />
     <ClInclude Include="3rdParty\ImGui\imstb_truetype.h" />
+    <ClInclude Include="FileHandler.hxx" />
+    <ClInclude Include="FileReader.hxx" />
+    <ClInclude Include="FontAwesome.hxx" />
+    <ClInclude Include="Helpers.hxx" />
+    <ClInclude Include="RCF.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="winmain.h" />
   </ItemGroup>
