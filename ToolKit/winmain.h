@@ -23,7 +23,6 @@
 
 // File handler
 #include "FileHandler.hxx"
-extern FileHandler* g_FileHandler;
 
 // Defines
 #define PROJECT_NAME        "Scarface Tool"

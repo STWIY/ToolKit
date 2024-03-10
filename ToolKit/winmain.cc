@@ -2,7 +2,7 @@
 
 // Globals
 HWND g_Window = nullptr;
-ImGuiIO* g_ImGuiIO = nullptr;
+ImGuiIO* g_ImGuiIO = nullptr; 
 
 const char* g_PopupErrorTitle = u8"\uF06A Error";
 
@@ -82,7 +82,7 @@ namespace Render
         // Options
         if (m_OpenFile)
         {
-                // Example usage
+            // Example usage
             std::string filePath = OpenFileDlg();
             if (!filePath.empty()) {
                 // File selected, process it
@@ -102,16 +102,20 @@ namespace Render
         Base();
 
         ImGui::Begin(m_TreeTitle);
-
+        {
+            RenderTree();
+        }
         ImGui::End();
 
         ImGui::Begin(m_PropertiesTitle);
-
+        {
+            RenderPropetries();
+        }
         ImGui::End();
 
         ImGui::Begin(m_HexEditorTitle);
         {
-            
+            RenderHex();
         }
         ImGui::End();
     }

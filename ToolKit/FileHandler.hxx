@@ -5,10 +5,17 @@
 #include <fstream>
 #include <string>
 #include <ctime>
+#include <sstream>
 
 #include "FileReader.hxx"
 #include "RCF.h"
 
+// 3rdParty (ImGui)
+#include "3rdParty/ImGui/imgui.h"
+#include "3rdParty/ImGui/imgui_internal.h"
+#include "3rdParty/ImGui/imgui_impl_win32.h"
+#include "3rdParty/ImGui/imgui_impl_dx11.h"
+#include "3rdParty/ImGui/imgui_memory_editor.h"
 
 class Console {
 public:
@@ -37,10 +44,28 @@ Console console;
 // File handler interfaces
 class FileHandler {
 public:
+    bool m_bFileLoaded = false;
+    bool m_bFileSelected = false;
+    struct DirectoryNode
+    {
+        std::string FullPath;
+        std::string FileName;
+        std::vector<DirectoryNode> Children;
+        bool IsDirectory;
+    };
+
+    DirectoryNode m_RootNode;
+    std::string selectedFilePath;
+
     virtual ~FileHandler() {}
 
     virtual void Load(const std::wstring& filePath) = 0;
+    virtual void RenderTree() = 0;
+    virtual void RenderPropetries() = 0;
+    virtual void RenderHex() = 0;
 };
+
+std::unique_ptr<FileHandler> g_FileHandler;
 
 class RCFHandler : public FileHandler {
 public:
@@ -48,8 +73,9 @@ public:
         std::wcout << "Loading RCF file: " << filePath << std::endl;
         ProcessRCFFile(filePath);
     }
+    RCF rcf;
 private:
-    void PrintRCFData(const RCF& rcf) {
+    void PrintRCFData() {
         // Print header data
         std::wcout << L"File ID: " << rcf.header.file_id << std::endl;
         std::wcout << L"Number of Files: " << rcf.header.number_files << std::endl;
@@ -77,87 +103,157 @@ private:
     }
 
     void ProcessRCFFile(const std::wstring& filePath) {
-        //RCF rcf;
 
-        //std::ifstream file(filePath, std::ios::binary);
-        //if (!file.is_open()) {
-        //    std::wcerr << L"Error opening file: " << filePath << std::endl;
-        //    return; // Return empty RCF on error
-        //}
-
-        //// Read header
-        //file.read(reinterpret_cast<char*>(&rcf.header), sizeof(Header));
-
-        //if (strcmp(rcf.header.file_id, "ATG CORE CEMENT LIBRARY") != 0) {
-        //    std::wcerr << L"Error: Not a valid RCF archive." << std::endl;
-        //    return;
-        //}
-
-        //// Read directory entries
-        //file.seekg(rcf.header.dir_offset);
-        //rcf.directory.resize(rcf.header.number_files);
-        //file.read(reinterpret_cast<char*>(rcf.directory.data()), rcf.header.dir_size);
-
-
-        //// Read filename directory entries
-        //file.seekg(rcf.header.flnames_dir_offset + 8);
-        //rcf.filename_directory.resize(rcf.header.number_files);
-        //for (auto& entry : rcf.filename_directory) {
-        //    file.read((char*)&entry.date, sizeof(entry.date));
-        //    file.read((char*)&entry.unk2, sizeof(entry.unk2));
-        //    file.read((char*)&entry.unk3, sizeof(entry.unk3));
-        //    file.read((char*)&entry.path_len, sizeof(entry.path_len));
-        //    char* path_buffer = new char[entry.path_len-1];
-        //    file.read(path_buffer, entry.path_len-1);
-        //    entry.path = std::string(path_buffer, entry.path_len - 1);
-        //    delete[] path_buffer;
-        //    file.read((char*)&entry.padding, sizeof(entry.padding));
-        //}
-
-        //file.close();
-
-        RCF rcf;
-
-        FileReader fileReader(filePath);
-        if (fileReader.data() == nullptr) {
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file.is_open()) {
             std::wcerr << L"Error opening file: " << filePath << std::endl;
             return; // Return empty RCF on error
         }
 
         // Read header
-        if (fileReader.size() < sizeof(Header)) {
-            std::wcerr << L"Error: File is too small to contain header." << std::endl;
-            return;
-        }
-        memcpy(&rcf.header, fileReader.data(), sizeof(Header));
+        file.read(reinterpret_cast<char*>(&rcf.header), sizeof(Header));
 
         if (strcmp(rcf.header.file_id, "ATG CORE CEMENT LIBRARY") != 0) {
             std::wcerr << L"Error: Not a valid RCF archive." << std::endl;
             return;
         }
 
-        const char* dirDataPtr = static_cast<const char*>(fileReader.data()) + rcf.header.dir_offset;
+        // Read directory entries
+        file.seekg(rcf.header.dir_offset);
         rcf.directory.resize(rcf.header.number_files);
-        memcpy(rcf.directory.data(), dirDataPtr, rcf.header.dir_size);
+        file.read(reinterpret_cast<char*>(rcf.directory.data()), rcf.header.dir_size);
 
-        const char* filenameDataPtr = static_cast<const char*>(fileReader.data()) + rcf.header.flnames_dir_offset + 8;
+
+        // Read filename directory entries
+        file.seekg(rcf.header.flnames_dir_offset + 8);
         rcf.filename_directory.resize(rcf.header.number_files);
         for (auto& entry : rcf.filename_directory) {
-            memcpy(&entry.date, filenameDataPtr, sizeof(entry.date));
-            filenameDataPtr += sizeof(entry.date);
-            memcpy(&entry.unk2, filenameDataPtr, sizeof(entry.unk2));
-            filenameDataPtr += sizeof(entry.unk2);
-            memcpy(&entry.unk3, filenameDataPtr, sizeof(entry.unk3));
-            filenameDataPtr += sizeof(entry.unk3);
-            memcpy(&entry.path_len, filenameDataPtr, sizeof(entry.path_len));
-            filenameDataPtr += sizeof(entry.path_len);
-            entry.path = std::string(filenameDataPtr, entry.path_len - 1);
-            filenameDataPtr += entry.path_len - 1;
-            memcpy(&entry.padding, filenameDataPtr, sizeof(entry.padding));
-            filenameDataPtr += sizeof(entry.padding);
+            file.read((char*)&entry.date, sizeof(entry.date));
+            file.read((char*)&entry.unk2, sizeof(entry.unk2));
+            file.read((char*)&entry.unk3, sizeof(entry.unk3));
+            file.read((char*)&entry.path_len, sizeof(entry.path_len));
+            char* path_buffer = new char[entry.path_len-1];
+            file.read(path_buffer, entry.path_len-1);
+            entry.path = std::string(path_buffer, entry.path_len - 1);
+            delete[] path_buffer;
+            file.read((char*)&entry.padding, sizeof(entry.padding));
         }
 
-        PrintRCFData(rcf);
+        file.close();
+
+        //PrintRCFData();
+
+        m_RootNode.FullPath = std::string(filePath.begin(), filePath.end());
+        m_RootNode.FileName = m_RootNode.FullPath.substr(m_RootNode.FullPath.find_last_of('\\') + 1);
+        m_RootNode.IsDirectory = true;
+        CreateTreeNodesFromPaths(m_RootNode);
+        m_bFileLoaded = true;
+    }
+
+    bool GetFileInformation(std::string path)
+    {
+        int index = 0;
+        for (const auto& filenameEntry : rcf.filename_directory) {
+            if (filenameEntry.path == path)
+            {
+                printf("File index: %d\n", index);
+                printf("File path: %s\n", path.c_str());
+                printf("File offset: %d\n", rcf.directory[index].fl_offset);
+                printf("File size: %d\n", rcf.directory[index].fl_size);
+                printf("File hash: %p\n", rcf.directory[index].hash);
+                return true;
+            }
+            index++;
+        }
+
+        return false;
+    }
+
+    void CreateTreeNodesFromPaths(DirectoryNode& parentNode) {
+        for (const auto& filenameEntry : rcf.filename_directory) {
+            std::string directoryPath = filenameEntry.path.substr(0, filenameEntry.path.find_last_of('\\'));
+
+            std::istringstream iss(directoryPath);
+            std::string directory;
+            DirectoryNode* currentNode = &parentNode;
+
+            while (std::getline(iss, directory, '\\')) {
+                bool found = false;
+                for (auto& child : currentNode->Children) {
+                    if (child.FileName == directory && child.IsDirectory) {
+                        currentNode = &child;
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    DirectoryNode newNode;
+                    newNode.FileName = directory;
+                    newNode.FullPath = directory;
+                    newNode.IsDirectory = true;
+                    currentNode->Children.push_back(newNode);
+                    currentNode = &currentNode->Children.back();
+                }
+            }
+
+            DirectoryNode fileNode;
+            fileNode.FileName = filenameEntry.path.substr(filenameEntry.path.find_last_of('\\') + 1);
+            fileNode.FullPath = filenameEntry.path;
+            fileNode.IsDirectory = false;
+            currentNode->Children.push_back(fileNode);
+        }
+    }
+
+
+    void DisplayDirectoryNode(const DirectoryNode& parentNode)
+    {
+        ImGui::PushID(&parentNode);
+        if (parentNode.IsDirectory)
+        {
+            if (ImGui::TreeNodeEx(parentNode.FileName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth))
+            {
+                for (const DirectoryNode& childNode : parentNode.Children)
+                    DisplayDirectoryNode(childNode);
+                ImGui::TreePop();
+            }
+        }
+        else
+        {
+            if (ImGui::TreeNodeEx(parentNode.FileName.c_str(), ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth))
+            {
+                if (ImGui::IsItemClicked() && selectedFilePath != parentNode.FullPath)
+                {
+                    m_bFileSelected = false;
+                    selectedFilePath = parentNode.FullPath;
+                    GetFileInformation(selectedFilePath);
+                    printf("Selected file: %s\n", selectedFilePath.c_str());
+                    m_bFileSelected = true;
+                }
+            }
+        }
+        ImGui::PopID();
+    }
+
+    void RenderTree()
+    {
+        DisplayDirectoryNode(g_FileHandler->m_RootNode);
+    }
+
+    void RenderPropetries()
+    {
+        if (g_FileHandler->m_bFileSelected)
+        {
+
+        }
+    }
+
+    void RenderHex()
+    {
+        if (g_FileHandler->m_bFileSelected)
+        {
+
+        }
     }
 };
 
@@ -167,6 +263,12 @@ public:
         std::wcout << "Loading P3D file: " << filePath << std::endl;
         // Add P3D file loading logic here
     }
+
+    void RenderTree() { }
+
+    void RenderPropetries() { }
+
+    void RenderHex() { }
 };
 
 class CSOHandler : public FileHandler {
@@ -175,6 +277,12 @@ public:
         std::wcout << "Loading CSO file: " << filePath << std::endl;
         // Add CSO file loading logic here
     }
+
+    void RenderTree() { }
+
+    void RenderPropetries() { }
+
+    void RenderHex() { }
 };
 
 class BIKHandler : public FileHandler {
@@ -183,6 +291,12 @@ public:
         std::wcout << "Loading BIK file: " << filePath << std::endl;
         // Add BIK file loading logic here
     }
+
+    void RenderTree() { }
+
+    void RenderPropetries() { }
+
+    void RenderHex() { }
 };
 
 class RSDHandler : public FileHandler {
@@ -191,6 +305,12 @@ public:
         std::wcout << "Loading RSD file: " << filePath << std::endl;
         // Add RSD file loading logic here
     }
+
+    void RenderTree() { }
+
+    void RenderPropetries() { }
+
+    void RenderHex() { }
 };
 
 // Function to open a file dialog and return the selected file path
@@ -219,26 +339,25 @@ void ProcessFile(const std::wstring& filePath) {
     size_t pos = filePath.find_last_of(L".");
     if (pos != std::wstring::npos) {
         std::wstring extension = filePath.substr(pos + 1);
-        std::unique_ptr<FileHandler> handler;
 
         if (extension == L"rcf") {
-            handler = std::make_unique<RCFHandler>();
+            g_FileHandler = std::make_unique<RCFHandler>();
         }
         else if (extension == L"p3d") {
-            handler = std::make_unique<P3DHandler>();
+            g_FileHandler = std::make_unique<P3DHandler>();
         }
         else if (extension == L"cso") {
-            handler = std::make_unique<CSOHandler>();
+            g_FileHandler = std::make_unique<CSOHandler>();
         }
         else if (extension == L"bik") {
-            handler = std::make_unique<BIKHandler>();
+            g_FileHandler = std::make_unique<BIKHandler>();
         }
         else if (extension == L"rsd") {
-            handler = std::make_unique<RSDHandler>();
+            g_FileHandler = std::make_unique<RSDHandler>();
         }
 
-        if (handler) {
-            handler->Load(filePath);
+        if (g_FileHandler) {
+            g_FileHandler->Load(filePath);
         }
         else {
             std::wcerr << "Unsupported file type: " << extension << std::endl;
@@ -246,5 +365,26 @@ void ProcessFile(const std::wstring& filePath) {
     }
     else {
         std::wcerr << "Invalid file path: " << filePath << std::endl;
+    }
+}
+
+void RenderTree()
+{
+    if (g_FileHandler && g_FileHandler->m_bFileLoaded) {
+        g_FileHandler->RenderTree();
+    }
+}
+
+void RenderPropetries()
+{
+    if (g_FileHandler && g_FileHandler->m_bFileLoaded) {
+        g_FileHandler->RenderPropetries();
+    }
+}
+
+void RenderHex()
+{
+    if (g_FileHandler && g_FileHandler->m_bFileLoaded) {
+        g_FileHandler->RenderHex();
     }
 }
