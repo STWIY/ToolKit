@@ -6,6 +6,7 @@
 #include <string>
 #include <ctime>
 #include <sstream>
+#include <algorithm>
 
 #include "FileReader.hxx"
 #include "RCF.h"
@@ -54,12 +55,29 @@ public:
         bool IsDirectory;
     };
 
+    enum eFileType
+    {
+        RCF_FILE,
+        P3D_FILE,
+        RSD_FILE,
+        CSO_FILE,
+        BIK_FILE,
+        FSC_FILE,
+        UNK_FILE
+    };
+    std::wstring workingFilePath;
+
+    eFileType m_eFileType = eFileType::UNK_FILE;
+    eFileType m_eSelectedFileType = eFileType::UNK_FILE;
+    std::vector<char> m_selectedfileContent;
+    int m_selectedFileSize;
+
     DirectoryNode m_RootNode;
     std::string selectedFilePath;
 
     virtual ~FileHandler() {}
 
-    virtual void Load(const std::wstring& filePath) = 0;
+    virtual void Load(const std::wstring& filePath, int offset = -1) = 0;
     virtual void RenderTree() = 0;
     virtual void RenderPropetries() = 0;
     virtual void RenderHex() = 0;
@@ -67,12 +85,15 @@ public:
 
 std::unique_ptr<FileHandler> g_FileHandler;
 
+FileHandler::eFileType GetFileTypeByPath(const std::wstring& filePath);
+
 class RCFHandler : public FileHandler {
 public:
-    void Load(const std::wstring& filePath) override {
-        std::wcout << "Loading RCF file: " << filePath << std::endl;
-        ProcessRCFFile(filePath);
+    void Load(const std::wstring& filePath, int offset = -1) override {
+        std::wcout << "Loading file: " << filePath << std::endl;
+        ProcessRCFFile(filePath, offset);
     }
+
     RCF rcf;
 private:
     void PrintRCFData() {
@@ -102,7 +123,15 @@ private:
 
     }
 
-    void ProcessRCFFile(const std::wstring& filePath) {
+    void ProcessRCFFile(const std::wstring& filePath, int offset = -1) {
+        g_FileHandler->workingFilePath = filePath;
+
+        m_bFileLoaded = false;
+
+        // Clear previous data in rcf
+        rcf.header = {};
+        rcf.directory.clear();
+        rcf.filename_directory.clear();
 
         std::ifstream file(filePath, std::ios::binary);
         if (!file.is_open()) {
@@ -110,11 +139,23 @@ private:
             return; // Return empty RCF on error
         }
 
+        // Seek to the provided offset if provided
+        if (offset != -1) {
+            std::wcout << L"Seek to offset: " << offset << std::endl;
+            file.seekg(offset);
+            if (!file) {
+                std::wcerr << L"Error seeking to offset: " << offset << std::endl;
+                file.close();
+                return;
+            }
+        }
+
         // Read header
         file.read(reinterpret_cast<char*>(&rcf.header), sizeof(Header));
 
         if (strcmp(rcf.header.file_id, "ATG CORE CEMENT LIBRARY") != 0) {
             std::wcerr << L"Error: Not a valid RCF archive." << std::endl;
+            file.close();
             return;
         }
 
@@ -123,17 +164,23 @@ private:
         rcf.directory.resize(rcf.header.number_files);
         file.read(reinterpret_cast<char*>(rcf.directory.data()), rcf.header.dir_size);
 
-
+        if (offset == -1) {
+            // Sort directory entries by file offset
+            std::sort(rcf.directory.begin(), rcf.directory.end(), [](const DirectoryEntry& a, const DirectoryEntry& b) {
+                return a.fl_offset < b.fl_offset;
+                });
+        }
+        
         // Read filename directory entries
-        file.seekg(rcf.header.flnames_dir_offset + 8);
+        file.seekg((offset == -1) ? rcf.header.flnames_dir_offset + 8 : rcf.header.flnames_dir_offset + 8 + offset);
         rcf.filename_directory.resize(rcf.header.number_files);
         for (auto& entry : rcf.filename_directory) {
-            file.read((char*)&entry.date, sizeof(entry.date));
+            file.read((char*)&entry.date, sizeof(entry.date));            
             file.read((char*)&entry.unk2, sizeof(entry.unk2));
             file.read((char*)&entry.unk3, sizeof(entry.unk3));
             file.read((char*)&entry.path_len, sizeof(entry.path_len));
-            char* path_buffer = new char[entry.path_len-1];
-            file.read(path_buffer, entry.path_len-1);
+            char* path_buffer = new char[entry.path_len - 1];
+            file.read(path_buffer, entry.path_len - 1);
             entry.path = std::string(path_buffer, entry.path_len - 1);
             delete[] path_buffer;
             file.read((char*)&entry.padding, sizeof(entry.padding));
@@ -143,7 +190,9 @@ private:
 
         //PrintRCFData();
 
-        m_RootNode.FullPath = std::string(filePath.begin(), filePath.end());
+        m_RootNode = DirectoryNode();
+
+        m_RootNode.FullPath = (offset == -1) ? std::string(filePath.begin(), filePath.end()) : std::string(selectedFilePath.begin(), selectedFilePath.end());
         m_RootNode.FileName = m_RootNode.FullPath.substr(m_RootNode.FullPath.find_last_of('\\') + 1);
         m_RootNode.IsDirectory = true;
         CreateTreeNodesFromPaths(m_RootNode);
@@ -161,6 +210,14 @@ private:
                 printf("File offset: %d\n", rcf.directory[index].fl_offset);
                 printf("File size: %d\n", rcf.directory[index].fl_size);
                 printf("File hash: %p\n", rcf.directory[index].hash);
+
+                std::wstring wPath(path.begin(), path.end());
+
+                g_FileHandler->m_eSelectedFileType = GetFileTypeByPath(wPath);
+
+                GetFileContent(g_FileHandler->workingFilePath, rcf.directory[index].fl_offset, rcf.directory[index].fl_size);
+
+                g_FileHandler->Load(g_FileHandler->workingFilePath, rcf.directory[index].fl_offset);
                 return true;
             }
             index++;
@@ -205,7 +262,6 @@ private:
         }
     }
 
-
     void DisplayDirectoryNode(const DirectoryNode& parentNode)
     {
         ImGui::PushID(&parentNode);
@@ -244,7 +300,11 @@ private:
     {
         if (g_FileHandler->m_bFileSelected)
         {
-
+            /*switch (g_FileHandler->m_eFileType)
+            {
+            case eFileType::RCF_FILE: 
+                break;
+            }*/
         }
     }
 
@@ -252,14 +312,31 @@ private:
     {
         if (g_FileHandler->m_bFileSelected)
         {
-
+            static MemoryEditor m_MemoryEdit;
+            m_MemoryEdit.DrawContents(m_selectedfileContent.data(), m_selectedFileSize);
         }
+    }
+
+    void GetFileContent(const std::wstring& filePath, int offset, int size)
+    {
+        // Read the content from the specified offset and size
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file.is_open()) {
+            std::wcerr << L"Error opening file: " << filePath << std::endl;
+            return;
+        }
+
+        file.seekg(offset);
+        m_selectedfileContent.resize(size);
+        file.read(m_selectedfileContent.data(), size);
+        m_selectedFileSize = size;
+        file.close();
     }
 };
 
 class P3DHandler : public FileHandler {
 public:
-    void Load(const std::wstring& filePath) override {
+    void Load(const std::wstring& filePath, int offset = -1)  override {
         std::wcout << "Loading P3D file: " << filePath << std::endl;
         // Add P3D file loading logic here
     }
@@ -273,7 +350,7 @@ public:
 
 class CSOHandler : public FileHandler {
 public:
-    void Load(const std::wstring& filePath) override {
+    void Load(const std::wstring& filePath, int offset = -1)  override {
         std::wcout << "Loading CSO file: " << filePath << std::endl;
         // Add CSO file loading logic here
     }
@@ -287,7 +364,7 @@ public:
 
 class BIKHandler : public FileHandler {
 public:
-    void Load(const std::wstring& filePath) override {
+    void Load(const std::wstring& filePath, int offset = -1)  override {
         std::wcout << "Loading BIK file: " << filePath << std::endl;
         // Add BIK file loading logic here
     }
@@ -301,7 +378,7 @@ public:
 
 class RSDHandler : public FileHandler {
 public:
-    void Load(const std::wstring& filePath) override {
+    void Load(const std::wstring& filePath, int offset = -1)  override {
         std::wcout << "Loading RSD file: " << filePath << std::endl;
         // Add RSD file loading logic here
     }
@@ -334,12 +411,44 @@ std::string OpenFileDlg() {
     }
 }
 
-// Function to determine the file type and choose the appropriate handler
-void ProcessFile(const std::wstring& filePath) {
+FileHandler::eFileType GetFileTypeByPath(const std::wstring& filePath)
+{
+    FileHandler::eFileType type = FileHandler::eFileType::UNK_FILE;
     size_t pos = filePath.find_last_of(L".");
     if (pos != std::wstring::npos) {
         std::wstring extension = filePath.substr(pos + 1);
 
+        if (extension == L"rcf") {
+            type = FileHandler::eFileType::RCF_FILE;
+        }
+        else if (extension == L"p3d") {
+            type = FileHandler::eFileType::P3D_FILE;
+        }
+        else if (extension == L"cso") {
+            type = FileHandler::eFileType::CSO_FILE;
+        }
+        else if (extension == L"bik") {
+            type = FileHandler::eFileType::BIK_FILE;
+        }
+        else if (extension == L"rsd") {
+            type = FileHandler::eFileType::RSD_FILE;
+        }
+        else if (extension == L"fsc") {
+            type = FileHandler::eFileType::FSC_FILE;
+        }
+    }
+    return type;
+}
+
+// Function to determine the file type and choose the appropriate handler
+void ProcessFile(const std::wstring& filePath, int offset = -1) {
+    
+    // Regular file loading procedure
+    size_t pos = filePath.find_last_of(L".");
+    if (pos != std::wstring::npos) {
+        std::wstring extension = filePath.substr(pos + 1);
+    
+        // Choose the appropriate handler based on file extension
         if (extension == L"rcf") {
             g_FileHandler = std::make_unique<RCFHandler>();
         }
@@ -355,9 +464,13 @@ void ProcessFile(const std::wstring& filePath) {
         else if (extension == L"rsd") {
             g_FileHandler = std::make_unique<RSDHandler>();
         }
-
+        else if (extension == L"fsc") {
+            g_FileHandler = std::make_unique<RSDHandler>();
+        }
+    
         if (g_FileHandler) {
-            g_FileHandler->Load(filePath);
+            g_FileHandler->m_eFileType = GetFileTypeByPath(filePath);
+            g_FileHandler->Load(filePath, offset);
         }
         else {
             std::wcerr << "Unsupported file type: " << extension << std::endl;
@@ -365,7 +478,7 @@ void ProcessFile(const std::wstring& filePath) {
     }
     else {
         std::wcerr << "Invalid file path: " << filePath << std::endl;
-    }
+    }    
 }
 
 void RenderTree()
