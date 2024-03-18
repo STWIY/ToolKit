@@ -73,7 +73,7 @@
     <ClInclude Include="Helpers.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="FileReader.hxx">
+    <ClInclude Include="P3D.h">
       <Filter>Project Files</Filter>
     </ClInclude>
   </ItemGroup>
