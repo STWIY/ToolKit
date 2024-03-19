@@ -6,7 +6,7 @@
 #pragma pack(push, 1)
 
 // Header structure
-struct Header {
+struct RCFHeader {
     char file_id[32];
     uint32_t unk1;
     uint32_t dir_offset;
@@ -18,14 +18,14 @@ struct Header {
 };
 
 // Directory entry structure
-struct DirectoryEntry {
+struct RCFDirectoryEntry {
     uint32_t hash;
     uint32_t fl_offset;
     uint32_t fl_size;
 };
 
 // Filename directory entry structure
-struct FilenameDirectoryEntry {
+struct RCFFilenameDirectoryEntry {
     uint32_t date;
     uint32_t unk2;
     uint32_t unk3;
@@ -38,7 +38,7 @@ struct FilenameDirectoryEntry {
 
 // Main structure to hold the data for cement files
 struct RCF {
-    Header header;
-    std::vector<DirectoryEntry> directory;
-    std::vector<FilenameDirectoryEntry> filename_directory;
+    RCFHeader header;
+    std::vector<RCFDirectoryEntry> directory;
+    std::vector<RCFFilenameDirectoryEntry> filename_directory;
 };

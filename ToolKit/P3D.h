@@ -31,5 +31,5 @@ struct P3DChunk {
 struct P3D {
     P3DHeader header;
     // Dynamically allocate an array of chunks
-    std::vector<P3DChunk*> chunks;
+    std::vector<P3DChunk> chunks;
 };

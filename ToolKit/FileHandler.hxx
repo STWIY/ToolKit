@@ -73,7 +73,7 @@ public:
     std::vector<char> m_selectedfileContent;
     int m_selectedFileSize;
 
-    DirectoryNode m_RootNode;
+    DirectoryNode* m_RootNode;
 
     virtual ~FileHandler() {}
 
@@ -122,6 +122,15 @@ public:
         setlocale(LC_ALL, curLocale.c_str());
         return result;
     }
+
+    std::string ExtractFileName(const std::string& filePath) 
+    {
+        size_t found = filePath.find_last_of("/\\");
+        if (found != std::string::npos) {
+            return filePath.substr(found + 1);
+        }
+        return filePath;
+    }
 };
 
 std::unique_ptr<FileHandler> g_FileHandler;
@@ -161,6 +170,8 @@ public:
         std::wcout << "Loading RCF file: " << filePath << std::endl;
         // Add RCF file loading logic here
 
+        m_bFileLoaded = false;
+
         if (offset == -1) m_workingFilePath = filePath;
 
         std::ifstream file(filePath, std::ios::binary);
@@ -182,7 +193,7 @@ public:
         }
 
         // Read header
-        file.read(reinterpret_cast<char*>(&rcf.header), sizeof(Header));
+        file.read(reinterpret_cast<char*>(&rcf.header), sizeof(RCFHeader));
 
         if (strcmp(rcf.header.file_id, "ATG CORE CEMENT LIBRARY") != 0) {
             std::wcerr << L"Error: Not a valid RCF archive." << std::endl;
@@ -196,9 +207,9 @@ public:
         file.read(reinterpret_cast<char*>(rcf.directory.data()), rcf.header.dir_size);
 
         // Sort directory entries by file offset
-        std::sort(rcf.directory.begin(), rcf.directory.end(), [](const DirectoryEntry& a, const DirectoryEntry& b) {
+        std::sort(rcf.directory.begin(), rcf.directory.end(), [](const RCFDirectoryEntry& a, const RCFDirectoryEntry& b) {
             return a.fl_offset < b.fl_offset;
-        });        
+            });
 
         // Read filename directory entries
         file.seekg((offset == -1) ? rcf.header.flnames_dir_offset + 8 : rcf.header.flnames_dir_offset + 8 + offset);
@@ -220,40 +231,44 @@ public:
 
         //PrintRCFData();
 
-        m_RootNode = DirectoryNode();
+        m_RootNode = new DirectoryNode();
 
-        m_RootNode.FullPath = (offset == -1) ? std::string(filePath.begin(), filePath.end()) : std::string(m_selectedFilePath.begin(), m_selectedFilePath.end());
-        m_RootNode.FileName = m_RootNode.FullPath.substr(m_RootNode.FullPath.find_last_of('\\') + 1);
-        m_RootNode.IsDirectory = true;
+        m_RootNode->FullPath = (offset == -1) ? std::string(filePath.begin(), filePath.end()) : std::string(m_selectedFilePath.begin(), m_selectedFilePath.end());
+        m_RootNode->FileName = m_RootNode->FullPath.substr(m_RootNode->FullPath.find_last_of('\\') + 1);
+        m_RootNode->IsDirectory = true;
         CreateTreeNodesFromPaths(m_RootNode);
         m_bFileLoaded = true;
     }
 
-    void CreateTreeNodesFromPaths(DirectoryNode& parentNode) {
+    void CreateTreeNodesFromPaths(DirectoryNode* parentNode) {
         for (const auto& filenameEntry : rcf.filename_directory) {
             std::string directoryPath = filenameEntry.path.substr(0, filenameEntry.path.find_last_of('\\'));
 
+            std::string fileName = g_FileHandler->ExtractFileName(filenameEntry.path);
+
             std::istringstream iss(directoryPath);
             std::string directory;
-            DirectoryNode* currentNode = &parentNode;
-
-            while (std::getline(iss, directory, '\\')) {
-                bool found = false;
-                for (auto& child : currentNode->Children) {
-                    if (child.FileName == directory && child.IsDirectory) {
-                        currentNode = &child;
-                        found = true;
-                        break;
+            DirectoryNode* currentNode = parentNode;
+            if (directoryPath != fileName)
+            {
+                while (std::getline(iss, directory, '\\')) {
+                    bool found = false;
+                    for (auto& child : currentNode->Children) {
+                        if (child.FileName == directory && child.IsDirectory) {
+                            currentNode = &child;
+                            found = true;
+                            break;
+                        }
                     }
-                }
 
-                if (!found) {
-                    DirectoryNode newNode;
-                    newNode.FileName = directory;
-                    newNode.FullPath = directory;
-                    newNode.IsDirectory = true;
-                    currentNode->Children.push_back(newNode);
-                    currentNode = &currentNode->Children.back();
+                    if (!found) {
+                        DirectoryNode newNode;
+                        newNode.FileName = directory;
+                        newNode.FullPath = directory;
+                        newNode.IsDirectory = true;
+                        currentNode->Children.push_back(newNode);
+                        currentNode = &currentNode->Children.back();
+                    }
                 }
             }
 
@@ -321,30 +336,30 @@ public:
         return false;
     }
 
-    void DisplayDirectoryNode(const DirectoryNode& parentNode)
+    void DisplayDirectoryNode(const DirectoryNode* parentNode)
     {
-        if (&parentNode.FileName)
+        if (parentNode != nullptr)
         {
-            ImGui::PushID(&parentNode);
-            if (parentNode.IsDirectory)
+            ImGui::PushID(parentNode);
+            if (parentNode->IsDirectory)
             {
-                if (ImGui::TreeNodeEx(parentNode.FileName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth))
+                if (ImGui::TreeNodeEx(parentNode->FileName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth))
                 {
-                    for (const DirectoryNode& childNode : parentNode.Children)
-                        DisplayDirectoryNode(childNode);
+                    for (const DirectoryNode& childNode : parentNode->Children)
+                        DisplayDirectoryNode(&childNode);
                     ImGui::TreePop();
                 }
             }
             else
             {
-                if (ImGui::TreeNodeEx(parentNode.FileName.c_str(), ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth))
+                if (ImGui::TreeNodeEx(parentNode->FileName.c_str(), ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth))
                 {
-                    if (ImGui::IsItemClicked(0) && g_FileHandler->m_selectedFilePath != parentNode.FullPath)
+                    if (ImGui::IsItemClicked(0) && g_FileHandler->m_selectedFilePath != parentNode->FullPath)
                     {
                         // hancle click action
                         /*g_FileHandler->m_bFileSelected = false;
                         g_FileHandler->m_bFileSelected = true;*/
-                        g_FileHandler->m_selectedFilePath = parentNode.FullPath;
+                        g_FileHandler->m_selectedFilePath = parentNode->FullPath;
                         printf("Clicked file: %s\n", g_FileHandler->m_selectedFilePath.c_str());
                         GetFileInformation(g_FileHandler->m_selectedFilePath);
                     }
@@ -355,9 +370,10 @@ public:
     }
 
 
-    void RenderTree() 
+    void RenderTree()
     {
-        DisplayDirectoryNode(g_FileHandler->m_RootNode);
+        if(g_FileHandler->m_bFileLoaded)
+            DisplayDirectoryNode(g_FileHandler->m_RootNode);
     }
 
     void RenderPropetries()
@@ -365,7 +381,7 @@ public:
         //DisplayPropertries();
     }
 
-    void RenderHex() 
+    void RenderHex()
     {
         if (g_FileHandler->m_bFileSelected)
         {
@@ -388,7 +404,7 @@ public:
         // Print chunks
         std::wcout << L"Chunks:" << std::endl;
         for (const auto& chunk : p3d.chunks) {
-            std::wcout << L"Chunk Type: 0x" << std::hex << chunk->chunk_header.data_type << L", Chunk Size: " << chunk->chunk_header.chunk_size << L", Sub Chunk length: " << chunk->chunk_header.sub_chunk_left_length << std::endl;
+            std::wcout << L"Chunk Type: 0x" << std::hex << chunk.chunk_header.data_type << L", Chunk Size: " << chunk.chunk_header.chunk_size << L", Sub Chunk length: " << chunk.chunk_header.sub_chunk_left_length << std::endl;
         }
 
     }
@@ -396,6 +412,8 @@ public:
     void Load(const std::wstring& filePath, int offset = -1)  override {
         std::wcout << "Loading P3D file: " << filePath << std::endl;
         // Add P3D file loading logic here
+
+        m_bFileLoaded = false;
 
         if (offset == -1) m_workingFilePath = filePath;
 
@@ -426,22 +444,28 @@ public:
             return;
         }
 
+        // Initialize total bytes read
+        uint32_t totalBytesRead = sizeof(P3DHeader);
+
         // Read chunks
-        while (file) {
-            P3DChunk* chunk = new P3DChunk();
-            if (!file.read(reinterpret_cast<char*>(&chunk->chunk_header), sizeof(P3DChunkHeader))) {
-                delete chunk;
-                break; // If unable to read chunk header, stop reading chunks
-            }
+        while (totalBytesRead < p3d.header.file_size) {
+            P3DChunk chunk;
+            file.read(reinterpret_cast<char*>(&chunk.chunk_header), sizeof(P3DChunkHeader));
+
+            // Calculate the total size of the chunk
+            uint32_t totalChunkSize = chunk.chunk_header.chunk_size;
 
             // Allocate memory for chunk body
-            chunk->chunk_body = new uint8_t[chunk->chunk_header.chunk_size - sizeof(P3DChunkHeader)];
+            chunk.chunk_body = new uint8_t[totalChunkSize - sizeof(P3DChunkHeader)];
 
             // Read chunk body
-            file.read(reinterpret_cast<char*>(chunk->chunk_body), chunk->chunk_header.chunk_size - sizeof(P3DChunkHeader));
+            file.read(reinterpret_cast<char*>(chunk.chunk_body), totalChunkSize - sizeof(P3DChunkHeader));
 
             // Add chunk to vector
             p3d.chunks.push_back(chunk);
+
+            // Update total bytes read
+            totalBytesRead += totalChunkSize;
         }
 
         // Close the file
@@ -449,11 +473,11 @@ public:
 
         PrintP3DData();
 
-        m_RootNode = DirectoryNode();
+        m_RootNode = new DirectoryNode();
 
-        m_RootNode.FullPath = (offset == -1) ? std::string(filePath.begin(), filePath.end()) : std::string(m_selectedFilePath.begin(), m_selectedFilePath.end());
-        m_RootNode.FileName = m_RootNode.FullPath.substr(m_RootNode.FullPath.find_last_of('\\') + 1);
-        m_RootNode.IsDirectory = true;
+        m_RootNode->FullPath = (offset == -1) ? std::string(filePath.begin(), filePath.end()) : std::string(m_selectedFilePath.begin(), m_selectedFilePath.end());
+        m_RootNode->FileName = m_RootNode->FullPath.substr(m_RootNode->FullPath.find_last_of('\\') + 1);
+        m_RootNode->IsDirectory = true;
 
         m_bFileLoaded = true;
     }
@@ -508,7 +532,7 @@ public:
 };
 
 // Function to open a file dialog and return the selected file path
-std::string OpenFileDlg() 
+std::string OpenFileDlg()
 {
     console.log("OpenFileDlg()");
     // Initialize the OPENFILENAMEA structure
@@ -518,7 +542,7 @@ std::string OpenFileDlg()
     m_OpenFileName.lStructSize = sizeof(OPENFILENAMEA);
     m_OpenFileName.lpstrFilter = "All Files\0*.*\0";
     m_OpenFileName.lpstrFile = szFileName;
-    m_OpenFileName.nMaxFile = MAX_PATH;  
+    m_OpenFileName.nMaxFile = MAX_PATH;
     m_OpenFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
 
     // Display the file dialog
@@ -538,7 +562,7 @@ std::wstring GetFileExtension(const std::wstring& filePath) {
     return L""; // If no extension found
 }
 
-void ProcessFile(const std::wstring filePath, int offset = -1) 
+void ProcessFile(const std::wstring filePath, int offset = -1)
 {
     console.log((offset == -1) ? "ProcessFile() disk file!" : "ProcessFile() sub file!");
     std::wstring extension = L"";
@@ -546,10 +570,10 @@ void ProcessFile(const std::wstring filePath, int offset = -1)
 
     if (offset != -1)
     {
-        m_selectedFilePath = g_FileHandler->m_selectedFilePath; 
+        m_selectedFilePath = g_FileHandler->m_selectedFilePath;
         extension = GetFileExtension(g_FileHandler->StringToWideString(m_selectedFilePath));
     }
-    else 
+    else
     {
         extension = GetFileExtension(filePath);
     }
@@ -557,32 +581,32 @@ void ProcessFile(const std::wstring filePath, int offset = -1)
 
     std::wcout << "File extension: " << extension << std::endl;
     switch (type) {
-        case FileHandler::eFileType::RCF_FILE:
-            std::wcout << L"File type is RCF_FILE" << std::endl;
-            g_FileHandler = std::make_unique<RCFHandler>();
-            break;
-        case FileHandler::eFileType::P3D_FILE:
-            std::wcout << L"File type is P3D_FILE" << std::endl;
-            g_FileHandler = std::make_unique<P3DHandler>();
-            break;
-        case FileHandler::eFileType::RSD_FILE:
-            std::wcout << L"File type is RSD_FILE" << std::endl;
-            g_FileHandler = std::make_unique<RSDHandler>();
-            break;
-        case FileHandler::eFileType::CSO_FILE:
-            std::wcout << L"File type is CSO_FILE" << std::endl;
-            g_FileHandler = std::make_unique<CSOHandler>();
-            break;
-        case FileHandler::eFileType::BIK_FILE:
-            std::wcout << L"File type is BIK_FILE" << std::endl;
-            g_FileHandler = std::make_unique<BIKHandler>();
-            break;
-        case FileHandler::eFileType::FSC_FILE:
-            std::wcout << L"File type is FSC_FILE" << std::endl;
-            break;
-        case FileHandler::eFileType::UNK_FILE:
-            std::wcout << L"Unknown file type" << std::endl;
-            break;
+    case FileHandler::eFileType::RCF_FILE:
+        std::wcout << L"File type is RCF_FILE" << std::endl;
+        g_FileHandler = std::make_unique<RCFHandler>();
+        break;
+    case FileHandler::eFileType::P3D_FILE:
+        std::wcout << L"File type is P3D_FILE" << std::endl;
+        g_FileHandler = std::make_unique<P3DHandler>();
+        break;
+    case FileHandler::eFileType::RSD_FILE:
+        std::wcout << L"File type is RSD_FILE" << std::endl;
+        g_FileHandler = std::make_unique<RSDHandler>();
+        break;
+    case FileHandler::eFileType::CSO_FILE:
+        std::wcout << L"File type is CSO_FILE" << std::endl;
+        g_FileHandler = std::make_unique<CSOHandler>();
+        break;
+    case FileHandler::eFileType::BIK_FILE:
+        std::wcout << L"File type is BIK_FILE" << std::endl;
+        g_FileHandler = std::make_unique<BIKHandler>();
+        break;
+    case FileHandler::eFileType::FSC_FILE:
+        std::wcout << L"File type is FSC_FILE" << std::endl;
+        break;
+    case FileHandler::eFileType::UNK_FILE:
+        std::wcout << L"Unknown file type" << std::endl;
+        break;
     }
 
     if (g_FileHandler) {
