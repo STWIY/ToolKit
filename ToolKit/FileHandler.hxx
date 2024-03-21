@@ -394,6 +394,37 @@ public:
 class P3DHandler : public FileHandler {
 public:
     P3D p3d;
+
+    void PrintP3DChunk(const std::vector<P3DChunk>& chunks, int depth = 0)
+    {
+        for (const auto& chunk : chunks)
+        {
+            // Print indentation based on depth
+            for (int i = 0; i < depth; ++i)
+                std::wcout << L"\t";
+
+            std::wcout << L"**** Chunk ID: " << std::hex << chunk.header.data_type << std::endl;
+
+            // Print other chunk information
+            for (int i = 0; i < depth; ++i)
+                std::wcout << L"\t";
+
+            std::wcout << L"\t chunk_size: " << std::hex << chunk.header.chunk_size << std::endl;
+
+            for (int i = 0; i < depth; ++i)
+                std::wcout << L"\t";
+
+            std::wcout << L"\t sub_chunks_size: " << std::hex << chunk.header.sub_chunks_size << std::endl;
+
+            // Recursively print child chunks
+            if (!chunk.childs.empty())
+            {
+                std::wcout << std::endl;
+                PrintP3DChunk(chunk.childs, depth + 1);
+            }
+        }
+    }
+
     void PrintP3DData()
     {
         // Print header data
@@ -401,12 +432,8 @@ public:
         std::wcout << L"File size: " << p3d.header.file_size << std::endl;
         std::wcout << L"File version: " << p3d.header.version << std::endl;
 
-        // Print chunks
-        std::wcout << L"Chunks:" << std::endl;
-        for (const auto& chunk : p3d.chunks) {
-            std::wcout << L"Chunk Type: 0x" << std::hex << chunk.chunk_header.data_type << L", Chunk Size: " << chunk.chunk_header.chunk_size << L", Sub Chunk length: " << chunk.chunk_header.sub_chunk_left_length << std::endl;
-        }
-
+        // Print chunks recursively ? todo
+        PrintP3DChunk(p3d.chunks);
     }
 
     void Load(const std::wstring& filePath, int offset = -1)  override {
@@ -444,29 +471,7 @@ public:
             return;
         }
 
-        // Initialize total bytes read
-        uint32_t totalBytesRead = sizeof(P3DHeader);
-
-        // Read chunks
-        while (totalBytesRead < p3d.header.file_size) {
-            P3DChunk chunk;
-            file.read(reinterpret_cast<char*>(&chunk.chunk_header), sizeof(P3DChunkHeader));
-
-            // Calculate the total size of the chunk
-            uint32_t totalChunkSize = chunk.chunk_header.chunk_size;
-
-            // Allocate memory for chunk body
-            chunk.chunk_body = new uint8_t[totalChunkSize - sizeof(P3DChunkHeader)];
-
-            // Read chunk body
-            file.read(reinterpret_cast<char*>(chunk.chunk_body), totalChunkSize - sizeof(P3DChunkHeader));
-
-            // Add chunk to vector
-            p3d.chunks.push_back(chunk);
-
-            // Update total bytes read
-            totalBytesRead += totalChunkSize;
-        }
+        p3d.get_chunks(file, p3d.header.file_size + offset);
 
         // Close the file
         file.close();
@@ -478,11 +483,70 @@ public:
         m_RootNode->FullPath = (offset == -1) ? std::string(filePath.begin(), filePath.end()) : std::string(m_selectedFilePath.begin(), m_selectedFilePath.end());
         m_RootNode->FileName = m_RootNode->FullPath.substr(m_RootNode->FullPath.find_last_of('\\') + 1);
         m_RootNode->IsDirectory = true;
-
+        CreateTreeNodesFromP3DChunks(p3d.chunks, m_RootNode);
         m_bFileLoaded = true;
     }
 
-    void RenderTree() { }
+    void CreateTreeNodesFromP3DChunks(const std::vector<P3DChunk>& chunks, DirectoryNode* parentNode) {
+        for (const auto& chunk : chunks) {
+            // Create file or directory node for the chunk
+            DirectoryNode node;
+
+            // Convert data_type to hexadecimal string
+            std::stringstream ss;
+            ss << std::hex << chunk.header.data_type;
+            node.FullPath = ss.str();
+            node.FileName = ss.str();
+
+            node.IsDirectory = (chunk.childs.size() > 0);
+
+            // Add the node to the parent directory
+            parentNode->Children.push_back(node);
+
+            // If the chunk has child chunks, recursively call the function
+            if (chunk.childs.size() > 0) {
+                CreateTreeNodesFromP3DChunks(chunk.childs, &parentNode->Children.back());
+            }
+        }
+    }
+
+    void DisplayDirectoryNode(const DirectoryNode* parentNode)
+    {
+        if (parentNode != nullptr)
+        {
+            ImGui::PushID(parentNode);
+            if (parentNode->IsDirectory)
+            {
+                if (ImGui::TreeNodeEx(parentNode->FileName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth))
+                {
+                    for (const DirectoryNode& childNode : parentNode->Children)
+                        DisplayDirectoryNode(&childNode);
+                    ImGui::TreePop();
+                }
+            }
+            else
+            {
+                if (ImGui::TreeNodeEx(parentNode->FileName.c_str(), ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth))
+                {
+                    if (ImGui::IsItemClicked(0) && g_FileHandler->m_selectedFilePath != parentNode->FullPath)
+                    {
+                        // hancle click action
+                        /*g_FileHandler->m_bFileSelected = false;
+                        g_FileHandler->m_bFileSelected = true;*/
+                        g_FileHandler->m_selectedFilePath = parentNode->FullPath;
+                        printf("Clicked file: %s\n", g_FileHandler->m_selectedFilePath.c_str());
+                    }
+                }
+            }
+            ImGui::PopID();
+        }
+    }
+
+    void RenderTree() 
+    {
+        if (g_FileHandler->m_bFileLoaded)
+            DisplayDirectoryNode(g_FileHandler->m_RootNode);
+    }
 
     void RenderPropetries() { }
 
@@ -567,6 +631,7 @@ void ProcessFile(const std::wstring filePath, int offset = -1)
     console.log((offset == -1) ? "ProcessFile() disk file!" : "ProcessFile() sub file!");
     std::wstring extension = L"";
     std::string m_selectedFilePath = "";
+    std::wcout << "offset: " << offset << std::endl;
 
     if (offset != -1)
     {
