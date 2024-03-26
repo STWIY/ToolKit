@@ -2,7 +2,6 @@
 
 #include <Windows.h>
 #include <iostream>
-#include <fstream>
 #include <sstream>
 
 #include "RCF.h"
@@ -14,6 +13,12 @@
 #include "3rdParty/ImGui/imgui_impl_win32.h"
 #include "3rdParty/ImGui/imgui_impl_dx11.h"
 #include "3rdParty/ImGui/imgui_memory_editor.h"
+
+#include "texture.hxx"
+#include "shader.hxx"
+#include "geometry.hxx"
+#include "composeitedrawable.hxx"
+#include "skeleton.hxx"
 
 class Console {
 public:
@@ -58,7 +63,9 @@ public:
         std::string FullPath;
         std::string FileName;
         std::vector<DirectoryNode> Children;
-        bool IsDirectory;
+        bool IsDirectory; 
+        std::streampos file_offset;
+        bool IsSelected;
     };
 
     bool m_bFileLoaded = false;
@@ -108,6 +115,32 @@ public:
         else {
             return eFileType::UNK_FILE;
         }
+    }
+
+    void GetFileContent(std::wstring filePath, int offset, int size)
+    {
+        // Read the content from the specified offset and size
+        FILE* m_File = nullptr;
+        errno_t err = _wfopen_s(&m_File, filePath.c_str(), L"rb");
+        if (err != 0 || m_File == nullptr) {
+            std::cerr << "Failed to open file!" << std::endl;
+            return;
+        }
+
+        // Seek to the provided offset if provided
+        if (fseek(m_File, offset, SEEK_SET) != 0) {
+            std::wcerr << L"Error seeking to offset: " << offset << std::endl;
+            fclose(m_File);
+            return;
+        }
+        
+        // Read
+        m_selectedfileContent.resize(size);
+        fread(m_selectedfileContent.data(), size, 1, m_File);
+        m_selectedFileSize = size;
+
+        // Close
+        fclose(m_File);
     }
 
     std::wstring StringToWideString(const std::string& s) {
@@ -166,17 +199,16 @@ public:
         }
     }
 
-    void Load(const std::wstring& filePath, int offset = -1)  override {
-        std::wcout << "Loading RCF file: " << filePath << std::endl;
-        // Add RCF file loading logic here
+    void Load(const std::wstring& filePath, int offset = -1) override {
+        std::wcout << L"Loading RCF file: " << filePath << std::endl;
 
         m_bFileLoaded = false;
 
         if (offset == -1) m_workingFilePath = filePath;
 
-        std::ifstream file(filePath, std::ios::binary);
-
-        if (!file.is_open()) {
+        FILE* m_File = nullptr;
+        errno_t err = _wfopen_s(&m_File, filePath.c_str(), L"rb");
+        if (err != 0 || m_File == nullptr) {
             std::cerr << "Failed to open file!" << std::endl;
             return;
         }
@@ -184,27 +216,26 @@ public:
         // Seek to the provided offset if provided
         if (offset != -1) {
             std::wcout << L"Seek to offset: " << offset << std::endl;
-            file.seekg(offset);
-            if (!file) {
+            if (fseek(m_File, offset, SEEK_SET) != 0) {
                 std::wcerr << L"Error seeking to offset: " << offset << std::endl;
-                file.close();
+                fclose(m_File);
                 return;
             }
         }
 
         // Read header
-        file.read(reinterpret_cast<char*>(&rcf.header), sizeof(RCFHeader));
+        fread(&rcf.header, sizeof(RCFHeader), 1, m_File);
 
         if (strcmp(rcf.header.file_id, "ATG CORE CEMENT LIBRARY") != 0) {
             std::wcerr << L"Error: Not a valid RCF archive." << std::endl;
-            file.close();
+            fclose(m_File);
             return;
         }
 
         // Read directory entries
-        file.seekg(rcf.header.dir_offset);
+        fseek(m_File, rcf.header.dir_offset, SEEK_SET);
         rcf.directory.resize(rcf.header.number_files);
-        file.read(reinterpret_cast<char*>(rcf.directory.data()), rcf.header.dir_size);
+        fread(rcf.directory.data(), sizeof(RCFDirectoryEntry), rcf.header.number_files, m_File);
 
         // Sort directory entries by file offset
         std::sort(rcf.directory.begin(), rcf.directory.end(), [](const RCFDirectoryEntry& a, const RCFDirectoryEntry& b) {
@@ -212,24 +243,22 @@ public:
             });
 
         // Read filename directory entries
-        file.seekg((offset == -1) ? rcf.header.flnames_dir_offset + 8 : rcf.header.flnames_dir_offset + 8 + offset);
+        fseek(m_File, (offset == -1) ? rcf.header.flnames_dir_offset + 8 : rcf.header.flnames_dir_offset + 8 + offset, SEEK_SET);
         rcf.filename_directory.resize(rcf.header.number_files);
         for (auto& entry : rcf.filename_directory) {
-            file.read((char*)&entry.date, sizeof(entry.date));
-            file.read((char*)&entry.unk2, sizeof(entry.unk2));
-            file.read((char*)&entry.unk3, sizeof(entry.unk3));
-            file.read((char*)&entry.path_len, sizeof(entry.path_len));
+            fread(&entry.date, sizeof(entry.date), 1, m_File);
+            fread(&entry.unk2, sizeof(entry.unk2), 1, m_File);
+            fread(&entry.unk3, sizeof(entry.unk3), 1, m_File);
+            fread(&entry.path_len, sizeof(entry.path_len), 1, m_File);
             char* path_buffer = new char[entry.path_len - 1];
-            file.read(path_buffer, entry.path_len - 1);
+            fread(path_buffer, entry.path_len - 1, 1, m_File);
             entry.path = std::string(path_buffer, entry.path_len - 1);
             delete[] path_buffer;
-            file.read((char*)&entry.padding, sizeof(entry.padding));
+            fread(&entry.padding, sizeof(entry.padding), 1, m_File);
         }
 
         // Close the file
-        file.close();
-
-        //PrintRCFData();
+        fclose(m_File);
 
         m_RootNode = new DirectoryNode();
 
@@ -239,6 +268,7 @@ public:
         CreateTreeNodesFromPaths(m_RootNode);
         m_bFileLoaded = true;
     }
+
 
     void CreateTreeNodesFromPaths(DirectoryNode* parentNode) {
         for (const auto& filenameEntry : rcf.filename_directory) {
@@ -280,22 +310,6 @@ public:
         }
     }
 
-    void GetFileContent(const std::wstring& filePath, int offset, int size)
-    {
-        // Read the content from the specified offset and size
-        std::ifstream file(filePath, std::ios::binary);
-        if (!file.is_open()) {
-            std::wcerr << L"Error opening file: " << filePath << std::endl;
-            return;
-        }
-
-        file.seekg(offset);
-        m_selectedfileContent.resize(size);
-        file.read(m_selectedfileContent.data(), size);
-        m_selectedFileSize = size;
-        file.close();
-    }
-
     bool GetFileInformation(std::string path)
     {
         int index = 0;
@@ -310,22 +324,7 @@ public:
 
                 std::wstring wPath(path.begin(), path.end());
 
-
-                /*m_RootNode = DirectoryNode();
-
-                m_RootNode.FullPath = path;
-                m_RootNode.FileName = path.substr(path.find_last_of('\\') + 1);
-                m_RootNode.IsDirectory = true;*/
-
                 GetFileContent(g_FileHandler->m_workingFilePath, rcf.directory[index].fl_offset, rcf.directory[index].fl_size);
-
-                /*rcf.header = {};
-                rcf.directory.clear();
-                rcf.filename_directory.clear();
-
-                g_FileHandler->m_bFileLoaded = false;
-
-                m_RootNode = DirectoryNode();*/
 
                 ProcessFile(g_FileHandler->m_workingFilePath, rcf.directory[index].fl_offset);
                 return true;
@@ -369,7 +368,6 @@ public:
         }
     }
 
-
     void RenderTree()
     {
         if(g_FileHandler->m_bFileLoaded)
@@ -395,6 +393,20 @@ class P3DHandler : public FileHandler {
 public:
     P3D p3d;
 
+    P3DHandler() 
+    {
+        g_LoadManager = new LoadManager();
+
+        g_LoadManager->AddHandler(new TextureLoader, Texture::TEXTURE, "TEXTURE");
+        g_LoadManager->AddHandler(new ShaderLoader, Shader::SHADER, "SHADER");
+        g_LoadManager->AddHandler(new GeometryLoader, Geometry::MESH, "MESH");
+        g_LoadManager->AddHandler(new CompositeDrawableLoader, CompositeDrawable::COMPOSITE_DRAWABLE, "COMPOSITE_DRAWABLE");
+        g_LoadManager->AddHandler(new SkeletonLoader, Skeleton::SKELETON, "SKELETON");
+
+        // Print all registered handlers
+        g_LoadManager->PrintHandlers();
+    }
+
     void PrintP3DChunk(const std::vector<P3DChunk>& chunks, int depth = 0)
     {
         for (const auto& chunk : chunks)
@@ -416,6 +428,11 @@ public:
 
             std::wcout << L"\t sub_chunks_size: " << std::hex << chunk.header.sub_chunks_size << std::endl;
 
+            for (int i = 0; i < depth; ++i)
+                std::wcout << L"\t";
+
+            std::wcout << L"\t chunk offset: " << std::dec << chunk.file_offset << std::endl;
+
             // Recursively print child chunks
             if (!chunk.childs.empty())
             {
@@ -432,21 +449,20 @@ public:
         std::wcout << L"File size: " << p3d.header.file_size << std::endl;
         std::wcout << L"File version: " << p3d.header.version << std::endl;
 
-        // Print chunks recursively ? todo
+        // Print chunks recursively
         PrintP3DChunk(p3d.chunks);
     }
 
-    void Load(const std::wstring& filePath, int offset = -1)  override {
-        std::wcout << "Loading P3D file: " << filePath << std::endl;
-        // Add P3D file loading logic here
+    void Load(const std::wstring& filePath, int offset = -1) override {
+        std::wcout << L"Loading P3D file: " << filePath << std::endl;
 
         m_bFileLoaded = false;
 
         if (offset == -1) m_workingFilePath = filePath;
 
-        std::ifstream file(filePath, std::ios::binary);
-
-        if (!file.is_open()) {
+        FILE* m_File = nullptr;
+        errno_t err = _wfopen_s(&m_File, filePath.c_str(), L"rb");
+        if (err != 0 || m_File == nullptr) {
             std::cerr << "Failed to open file!" << std::endl;
             return;
         }
@@ -454,27 +470,29 @@ public:
         // Seek to the provided offset if provided
         if (offset != -1) {
             std::wcout << L"Seek to offset: " << offset << std::endl;
-            file.seekg(offset);
-            if (!file) {
+            if (fseek(m_File, offset, SEEK_SET) != 0) {
                 std::wcerr << L"Error seeking to offset: " << offset << std::endl;
-                file.close();
+                fclose(m_File);
                 return;
             }
         }
 
         // Read header
-        file.read(reinterpret_cast<char*>(&p3d.header), sizeof(P3DHeader));
-        //
+        fread(&p3d.header, sizeof(P3DHeader), 1, m_File);
+
+        m_bFileSelected = true;
+        GetFileContent(filePath, (offset != -1) ? offset : 0, p3d.header.file_size);
+
         if (memcmp(p3d.header.file_id, "P3D", sizeof(p3d.header.file_id)) != 0) {
             std::wcerr << L"Error: Not a valid P3D archive." << std::endl;
-            file.close();
+            fclose(m_File);
             return;
         }
 
-        p3d.get_chunks(file, p3d.header.file_size + offset);
+        p3d.GetChunks(m_File, p3d.header.file_size + offset);
 
         // Close the file
-        file.close();
+        fclose(m_File);
 
         PrintP3DData();
 
@@ -492,12 +510,13 @@ public:
             // Create file or directory node for the chunk
             DirectoryNode node;
 
-            // Convert data_type to hexadecimal string
+            // Convert data_type to hexadecimal string and add chunk name
             std::stringstream ss;
-            ss << std::hex << chunk.header.data_type;
+            ss << std::hex << chunk.header.data_type << " - " << g_LoadManager->GetName(chunk.header.data_type);
+
             node.FullPath = ss.str();
             node.FileName = ss.str();
-
+            node.file_offset = chunk.file_offset;
             node.IsDirectory = (chunk.childs.size() > 0);
 
             // Add the node to the parent directory
@@ -509,32 +528,59 @@ public:
             }
         }
     }
-
-    void DisplayDirectoryNode(const DirectoryNode* parentNode)
+    
+    void DisplayDirectoryNode(DirectoryNode& parentNode)
     {
-        if (parentNode != nullptr)
+        if (&parentNode != nullptr)
         {
-            ImGui::PushID(parentNode);
-            if (parentNode->IsDirectory)
+            ImGuiTreeNodeFlags nodeFlags = 0;
+
+            if (parentNode.IsSelected)
+                nodeFlags |= ImGuiTreeNodeFlags_Selected;
+
+            ImGui::PushID(&parentNode);
+
+            if (parentNode.IsDirectory)
             {
-                if (ImGui::TreeNodeEx(parentNode->FileName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth))
+                if (ImGui::TreeNodeEx(parentNode.FileName.c_str(),
+                    ImGuiTreeNodeFlags_SpanFullWidth |
+                    ImGuiTreeNodeFlags_OpenOnDoubleClick |
+                    nodeFlags))
                 {
-                    for (const DirectoryNode& childNode : parentNode->Children)
-                        DisplayDirectoryNode(&childNode);
+
+                    for (DirectoryNode& childNode : parentNode.Children)
+                        DisplayDirectoryNode(childNode);
                     ImGui::TreePop();
+                }
+                // Handle selection logic
+                if (ImGui::IsItemClicked())
+                {
+                    // Unselect all nodes first
+                    UnselectAllNodes(*m_RootNode);
+                    // Select the clicked node
+                    parentNode.IsSelected = true;
                 }
             }
             else
             {
-                if (ImGui::TreeNodeEx(parentNode->FileName.c_str(), ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth))
+                if (ImGui::TreeNodeEx(parentNode.FileName.c_str(),
+                    ImGuiTreeNodeFlags_NoTreePushOnOpen |
+                    ImGuiTreeNodeFlags_Leaf |
+                    ImGuiTreeNodeFlags_SpanFullWidth |
+                    nodeFlags))
                 {
-                    if (ImGui::IsItemClicked(0) && g_FileHandler->m_selectedFilePath != parentNode->FullPath)
+                    if (ImGui::IsItemClicked(0) && g_FileHandler->m_selectedFilePath != parentNode.FullPath)
                     {
-                        // hancle click action
-                        /*g_FileHandler->m_bFileSelected = false;
-                        g_FileHandler->m_bFileSelected = true;*/
-                        g_FileHandler->m_selectedFilePath = parentNode->FullPath;
-                        printf("Clicked file: %s\n", g_FileHandler->m_selectedFilePath.c_str());
+                        // Unselect all nodes first
+                        UnselectAllNodes(*m_RootNode);
+                        // Select the clicked node
+                        parentNode.IsSelected = true;
+
+                        // handle click action
+                        g_FileHandler->m_bFileSelected = false;
+                        g_FileHandler->m_selectedFilePath = parentNode.FullPath;
+                        printf("Clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(parentNode.file_offset));
+                        g_FileHandler->m_bFileSelected = true;
                     }
                 }
             }
@@ -542,15 +588,26 @@ public:
         }
     }
 
+    void UnselectAllNodes(DirectoryNode& parentNode)
+    {
+        parentNode.IsSelected = false;
+        for (DirectoryNode& childNode : parentNode.Children)
+            UnselectAllNodes(childNode);
+    }
+
     void RenderTree() 
     {
         if (g_FileHandler->m_bFileLoaded)
-            DisplayDirectoryNode(g_FileHandler->m_RootNode);
+            DisplayDirectoryNode(*g_FileHandler->m_RootNode);
     }
 
     void RenderPropetries() { }
 
-    void RenderHex() { }
+    void RenderHex() 
+    {
+        static MemoryEditor m_MemoryEdit;
+        m_MemoryEdit.DrawContents(m_selectedfileContent.data(), m_selectedFileSize);
+    }
 };
 
 class CSOHandler : public FileHandler {
@@ -694,7 +751,6 @@ void RenderPropetries()
     if (g_FileHandler == nullptr) return;
     if (g_FileHandler->m_bFileLoaded && g_FileHandler->m_bFileSelected)
     {
-        console.log("RenderPropetries()");
         g_FileHandler->RenderPropetries();
     }
 }
@@ -704,7 +760,6 @@ void RenderHex()
     if (g_FileHandler == nullptr) return;
     if (g_FileHandler->m_bFileLoaded && g_FileHandler->m_bFileSelected)
     {
-        console.log("RenderHex()");
         g_FileHandler->RenderHex();
     }
 }

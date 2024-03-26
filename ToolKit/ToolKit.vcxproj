@@ -160,12 +160,17 @@
     <ClInclude Include="3rdParty\ImGui\imstb_rectpack.h" />
     <ClInclude Include="3rdParty\ImGui\imstb_textedit.h" />
     <ClInclude Include="3rdParty\ImGui\imstb_truetype.h" />
+    <ClInclude Include="composeitedrawable.hxx" />
     <ClInclude Include="FileHandler.hxx" />
     <ClInclude Include="FontAwesome.hxx" />
+    <ClInclude Include="geometry.hxx" />
     <ClInclude Include="Helpers.hxx" />
     <ClInclude Include="P3D.h" />
     <ClInclude Include="RCF.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="shader.hxx" />
+    <ClInclude Include="skeleton.hxx" />
+    <ClInclude Include="texture.hxx" />
     <ClInclude Include="winmain.h" />
   </ItemGroup>
   <ItemGroup>

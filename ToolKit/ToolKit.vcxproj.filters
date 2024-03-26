@@ -76,6 +76,21 @@
     <ClInclude Include="P3D.h">
       <Filter>Project Files</Filter>
     </ClInclude>
+    <ClInclude Include="texture.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shader.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="skeleton.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="composeitedrawable.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="geometry.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ToolKit.rc" />
