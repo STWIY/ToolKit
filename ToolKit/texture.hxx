@@ -15,7 +15,8 @@ public:
 	uint32_t alphaDepth;
 	uint32_t numMipmaps;
 
-	enum {
+	enum 
+	{
 		TEXTURE = 0x19000,
 		IMAGE = 0x19001,
 		IMAGE_DATA = 0x19002,
@@ -57,8 +58,6 @@ class TextureLoader : public ObjectLoader
 	Texture* LoadImage(std::ifstream& file, Texture* texture, int mipmap)
 	{
 		// TODO:
-		Texture* texture = nullptr;
-
 		return texture;
 	}
 };

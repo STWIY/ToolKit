@@ -1,18 +1,10 @@
 #include "winmain.h"
 
-// Globals
-HWND g_Window = nullptr;
-ImGuiIO* g_ImGuiIO = nullptr; 
-
 const char* g_PopupErrorTitle = u8"\uF06A Error";
 
 // Render
 namespace Render
 {
-    const char* m_TreeTitle = u8"\uE1D2 Tree";
-    const char* m_PropertiesTitle = u8"\uF1DE Properties";
-    const char* m_HexEditorTitle = u8"\uE33B Hex Editor";
-
     void Base()
     {
         ImGui::SetNextWindowPos({ 0.f, 0.f });
@@ -28,21 +20,7 @@ namespace Render
         ImGuiID m_DockSpaceID = ImGui::GetID("##BaseDockSpace");
         ImGui::DockSpace(m_DockSpaceID, { 0.f, 0.f }, ImGuiDockNodeFlags_PassthruCentralNode);
 
-        static bool m_BuildDockSpace = true;
-        if (m_BuildDockSpace)
-        {
-            m_BuildDockSpace = false;
-            {
-                ImGui::DockBuilderDockWindow(m_TreeTitle, ImGui::DockBuilderSplitNode(m_DockSpaceID, ImGuiDir_Left, 0.45f, nullptr, nullptr));
-
-                ImGuiID m_PropertiesID = ImGui::DockBuilderSplitNode(m_DockSpaceID, ImGuiDir_None, 0.f, nullptr, nullptr);
-                ImGui::DockBuilderDockWindow(m_PropertiesTitle, m_PropertiesID);
-                ImGui::DockBuilderDockWindow(m_HexEditorTitle, ImGui::DockBuilderSplitNode(m_PropertiesID, ImGuiDir_Down, 0.45f, nullptr, nullptr));
-            }
-            ImGui::DockBuilderFinish(m_DockSpaceID);
-        }
-
-        bool m_OpenFile = false, m_SaveFile = false;
+        bool m_OpenFile = false;
 
         if (ImGui::BeginMenuBar())
         {
@@ -50,7 +28,6 @@ namespace Render
             {
                 if (ImGui::MenuItemEx("Open", u8"\uF56F", "CTRL + O"))
                     m_OpenFile = true;
-
 
                 ImGui::EndMenu();
             }
@@ -61,8 +38,7 @@ namespace Render
         {
             std::pair<std::pair<ImGuiKey, ImGuiKey>, bool*> m_Shortcuts[] =
             {
-                { { ImGuiKey_LeftCtrl, ImGuiKey_O }, &m_OpenFile },
-                { { ImGuiKey_LeftCtrl, ImGuiKey_S }, &m_SaveFile },
+                { { ImGuiKey_LeftCtrl, ImGuiKey_O }, &m_OpenFile }
             };
             for (auto& m_Pair : m_Shortcuts)
             {
@@ -83,10 +59,10 @@ namespace Render
         if (m_OpenFile)
         {
             // Example usage
-            std::string filePath = OpenFileDlg();
+            std::string filePath = g_FileHandler->OpenFileDlg();
             if (!filePath.empty()) {
                 // File selected, process it
-                ProcessFile(std::wstring(filePath.begin(), filePath.end()));
+                g_FileHandler->ProcessFile(std::wstring(filePath.begin(), filePath.end()));
             }
             else {
                 // No file selected or dialog canceled
@@ -99,25 +75,16 @@ namespace Render
 
     void OnFrame()
     {
-        Base();
-
-        ImGui::Begin(m_TreeTitle);
+        if (g_FileHandler != nullptr)
         {
-            RenderTree();
+            // Render different layouts based on file type
+            if (g_FileHandler->m_LoadedFileType != FileHandler::eFileType::UNK_FILE && g_FileHandler->m_bFileLoaded)
+                g_FileHandler->Render();
         }
-        ImGui::End();
-
-        ImGui::Begin(m_PropertiesTitle);
+        else 
         {
-            RenderPropetries();
+            Base();
         }
-        ImGui::End();
-
-        ImGui::Begin(m_HexEditorTitle);
-        {
-            RenderHex();
-        }
-        ImGui::End();
     }
 }
 

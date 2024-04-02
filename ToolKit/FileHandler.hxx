@@ -44,7 +44,6 @@ public:
 
 Console console;
 
-// File handler interfaces
 class FileHandler {
 public:
     enum eFileType
@@ -58,63 +57,79 @@ public:
         UNK_FILE
     };
 
-    struct DirectoryNode
-    {
-        std::string FullPath;
-        std::string FileName;
-        std::vector<DirectoryNode> Children;
-        bool IsDirectory; 
-        std::streampos file_offset;
-        bool IsSelected;
-    };
-
+    eFileType m_LoadedFileType = eFileType::UNK_FILE;
+    std::wstring m_LoadedFilePath;
     bool m_bFileLoaded = false;
-    bool m_bIsSubFile = false;
-    bool m_bFileSelected = false;
-
-    std::wstring m_workingFilePath;
-    eFileType m_eWorkingFileType;
 
     std::string m_selectedFilePath;
-    eFileType m_eSelectedFileType;
+
     std::vector<char> m_selectedfileContent;
     int m_selectedFileSize;
 
-    DirectoryNode* m_RootNode;
+    virtual void LoadFile(const std::wstring& filePath, int offset = -1) = 0;
 
-    virtual ~FileHandler() {}
+    virtual void Render() = 0;
 
-    virtual void Load(const std::wstring& filePath, int offset = -1) = 0;
-    virtual void RenderTree() = 0;
-    virtual void RenderPropetries() = 0;
-    virtual void RenderHex() = 0;
+    std::string ExtractFileName(const std::string& filePath)
+    {
+        size_t found = filePath.find_last_of("/\\");
+        if (found != std::string::npos) {
+            return filePath.substr(found + 1);
+        }
+        return filePath;
+    }
 
-    static eFileType GetFileType(const std::wstring& ext) {
-        std::wstring lowerExt = ext;
-        // Convert the extension to lowercase for case-insensitive comparison
-        std::transform(lowerExt.begin(), lowerExt.end(), lowerExt.begin(), towlower);
+    // Function to open a file dialog and return the selected file path
+    std::string OpenFileDlg()
+    {
+        console.log("OpenFileDlg()");
+        // Initialize the OPENFILENAMEA structure
+        static OPENFILENAMEA m_OpenFileName = { 0 };
+        char szFileName[MAX_PATH] = { 0 };
 
-        if (lowerExt == L"rcf") {
-            return eFileType::RCF_FILE;
-        }
-        else if (lowerExt == L"p3d") {
-            return eFileType::P3D_FILE;
-        }
-        else if (lowerExt == L"rsd") {
-            return eFileType::RSD_FILE;
-        }
-        else if (lowerExt == L"cso") {
-            return eFileType::CSO_FILE;
-        }
-        else if (lowerExt == L"bik") {
-            return eFileType::BIK_FILE;
-        }
-        else if (lowerExt == L"fsc") {
-            return eFileType::FSC_FILE;
+        m_OpenFileName.lStructSize = sizeof(OPENFILENAMEA);
+        m_OpenFileName.lpstrFilter = "All Files\0*.*\0";
+        m_OpenFileName.lpstrFile = szFileName;
+        m_OpenFileName.nMaxFile = MAX_PATH;
+        m_OpenFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
+
+        // Display the file dialog
+        if (GetOpenFileNameA(&m_OpenFileName)) {
+            return std::string(szFileName);
         }
         else {
-            return eFileType::UNK_FILE;
+            return "";
         }
+    }
+
+    std::wstring GetFileExtension(const std::wstring& filePath) {
+        size_t dotPos = filePath.find_last_of(L'.');
+        if (dotPos != std::wstring::npos) {
+            return filePath.substr(dotPos + 1);
+        }
+        return L""; // If no extension found
+    }
+
+    void SaveToTempFile(std::string fileName, int size)
+    {
+        // Create a temporary file
+        std::filesystem::path tempDir = std::filesystem::temp_directory_path();
+        std::filesystem::path tempFilePath = tempDir / fileName;
+        FILE* tempFile = nullptr;
+        errno_t err = fopen_s(&tempFile, tempFilePath.string().c_str(), "wb");
+        if (err != 0 || tempFile == nullptr) {
+            std::cerr << "Failed to create temporary file!" << std::endl;
+            return;
+        }
+
+        // Write the content to the temporary file
+        fwrite(m_selectedfileContent.data(), size, 1, tempFile);
+
+        // Close the temporary file
+        fclose(tempFile);
+
+        m_LoadedFilePath = tempDir / fileName;
+
     }
 
     void GetFileContent(std::wstring filePath, int offset, int size)
@@ -133,7 +148,7 @@ public:
             fclose(m_File);
             return;
         }
-        
+
         // Read
         m_selectedfileContent.resize(size);
         fread(m_selectedfileContent.data(), size, 1, m_File);
@@ -141,70 +156,39 @@ public:
 
         // Close
         fclose(m_File);
+
+        SaveToTempFile(ExtractFileName(m_selectedFilePath).c_str(), size);
     }
 
-    std::wstring StringToWideString(const std::string& s) {
-        std::string curLocale = setlocale(LC_ALL, "");
-        const char* _Source = s.c_str();
-        size_t _Dsize = mbstowcs(NULL, _Source, 0) + 1;
-        wchar_t* _Dest = new wchar_t[_Dsize];
-        wmemset(_Dest, 0, _Dsize);
-        mbstowcs(_Dest, _Source, _Dsize);
-        std::wstring result = _Dest;
-        delete[]_Dest;
-        setlocale(LC_ALL, curLocale.c_str());
-        return result;
-    }
-
-    std::string ExtractFileName(const std::string& filePath) 
-    {
-        size_t found = filePath.find_last_of("/\\");
-        if (found != std::string::npos) {
-            return filePath.substr(found + 1);
-        }
-        return filePath;
-    }
+    void ProcessFile(const std::wstring filePath, int offset = -1);
 };
 
 std::unique_ptr<FileHandler> g_FileHandler;
-void ProcessFile(const std::wstring filePath, int offset);
+
 
 class RCFHandler : public FileHandler {
 public:
     RCF rcf;
 
-    void PrintRCFData() {
-        // Print header data
-        std::wcout << L"File ID: " << rcf.header.file_id << std::endl;
-        std::wcout << L"Number of Files: " << rcf.header.number_files << std::endl;
+    struct DirectoryNode
+    {
+        std::string FullPath;
+        std::string FileName;
+        std::vector<DirectoryNode> Children;
+        bool IsDirectory;
+        std::streampos file_offset;
+        bool IsSelected;
+    };
 
-        // Print directory entries
-        std::wcout << L"Directory Entries:" << std::endl;
-        for (const auto& dirEntry : rcf.directory) {
-            std::wcout << L"Hash: " << dirEntry.hash << L", File Offset: " << dirEntry.fl_offset << L", File Size: " << dirEntry.fl_size << std::endl;
-        }
+    DirectoryNode* m_RootNode;
 
-        // Print filename directory entries
-        std::wcout << L"Filename Directory Entries:" << std::endl;
-        for (const auto& filenameEntry : rcf.filename_directory) {
-            // Convert timestamp to human-readable format
-            std::time_t timestamp = filenameEntry.date;
-            std::tm* timeinfo = std::localtime(&timestamp);
-            char buffer[80];
-            std::strftime(buffer, 80, "%Y-%m-%d %H:%M:%S", timeinfo);
-
-            // Print date and path
-            std::wcout << L"Date: " << buffer << std::endl;
-            std::cout << "Path: " << filenameEntry.path << std::endl;
-        }
-    }
-
-    void Load(const std::wstring& filePath, int offset = -1) override {
+    void LoadFile(const std::wstring& filePath, int offset = -1)
+    {
         std::wcout << L"Loading RCF file: " << filePath << std::endl;
 
         m_bFileLoaded = false;
 
-        if (offset == -1) m_workingFilePath = filePath;
+        if (offset == -1) m_LoadedFilePath = filePath;
 
         FILE* m_File = nullptr;
         errno_t err = _wfopen_s(&m_File, filePath.c_str(), L"rb");
@@ -269,8 +253,8 @@ public:
         m_bFileLoaded = true;
     }
 
-
-    void CreateTreeNodesFromPaths(DirectoryNode* parentNode) {
+    void CreateTreeNodesFromPaths(DirectoryNode* parentNode) 
+    {
         for (const auto& filenameEntry : rcf.filename_directory) {
             std::string directoryPath = filenameEntry.path.substr(0, filenameEntry.path.find_last_of('\\'));
 
@@ -324,9 +308,9 @@ public:
 
                 std::wstring wPath(path.begin(), path.end());
 
-                GetFileContent(g_FileHandler->m_workingFilePath, rcf.directory[index].fl_offset, rcf.directory[index].fl_size);
+                GetFileContent(g_FileHandler->m_LoadedFilePath, rcf.directory[index].fl_offset, rcf.directory[index].fl_size);
 
-                ProcessFile(g_FileHandler->m_workingFilePath, rcf.directory[index].fl_offset);
+                ProcessFile(g_FileHandler->m_LoadedFilePath);// , rcf.directory[index].fl_offset);
                 return true;
             }
             index++;
@@ -355,9 +339,6 @@ public:
                 {
                     if (ImGui::IsItemClicked(0) && g_FileHandler->m_selectedFilePath != parentNode->FullPath)
                     {
-                        // hancle click action
-                        /*g_FileHandler->m_bFileSelected = false;
-                        g_FileHandler->m_bFileSelected = true;*/
                         g_FileHandler->m_selectedFilePath = parentNode->FullPath;
                         printf("Clicked file: %s\n", g_FileHandler->m_selectedFilePath.c_str());
                         GetFileInformation(g_FileHandler->m_selectedFilePath);
@@ -370,30 +351,129 @@ public:
 
     void RenderTree()
     {
-        if(g_FileHandler->m_bFileLoaded)
-            DisplayDirectoryNode(g_FileHandler->m_RootNode);
+        if (g_FileHandler->m_bFileLoaded)
+            DisplayDirectoryNode(m_RootNode);
     }
 
     void RenderPropetries()
     {
-        //DisplayPropertries();
     }
 
     void RenderHex()
     {
-        if (g_FileHandler->m_bFileSelected)
+    }
+
+    void Base()
+    {
+        ImGui::SetNextWindowPos({ 0.f, 0.f });
+        ImGui::SetNextWindowSize(g_ImGuiIO->DisplaySize);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f });
+
+        ImGui::Begin("##Base", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus);
+
+        ImGui::PopStyleVar(3);
+
+        ImGuiID m_DockSpaceID = ImGui::GetID("##BaseDockSpace");
+        ImGui::DockSpace(m_DockSpaceID, { 0.f, 0.f }, ImGuiDockNodeFlags_PassthruCentralNode);
+
+        static bool m_BuildDockSpace = true;
+        if (m_BuildDockSpace)
         {
-            static MemoryEditor m_MemoryEdit;
-            m_MemoryEdit.DrawContents(m_selectedfileContent.data(), m_selectedFileSize);
+            m_BuildDockSpace = false;
+            {
+                ImGui::DockBuilderDockWindow(g_TreeTitle, ImGui::DockBuilderSplitNode(m_DockSpaceID, ImGuiDir_Left, 0.45f, nullptr, nullptr));
+
+                ImGuiID m_PropertiesID = ImGui::DockBuilderSplitNode(m_DockSpaceID, ImGuiDir_None, 0.f, nullptr, nullptr);
+                ImGui::DockBuilderDockWindow(g_PropertiesTitle, m_PropertiesID);
+                ImGui::DockBuilderDockWindow(g_HexEditorTitle, ImGui::DockBuilderSplitNode(m_PropertiesID, ImGuiDir_Down, 0.45f, nullptr, nullptr));
+            }
+            ImGui::DockBuilderFinish(m_DockSpaceID);
         }
+
+        bool m_OpenFile = false, m_SaveFile = false;
+
+        if (ImGui::BeginMenuBar())
+        {
+            if (ImGui::BeginMenu(u8"\uF15B File"))
+            {
+                if (ImGui::MenuItemEx("Open", u8"\uF56F", "CTRL + O"))
+                    m_OpenFile = true;
+
+
+                ImGui::EndMenu();
+            }
+        }
+
+        // Shortcuts
+        if (ImGui::GetCurrentContext()->OpenPopupStack.empty())
+        {
+            std::pair<std::pair<ImGuiKey, ImGuiKey>, bool*> m_Shortcuts[] =
+            {
+                { { ImGuiKey_LeftCtrl, ImGuiKey_O }, &m_OpenFile },
+                { { ImGuiKey_LeftCtrl, ImGuiKey_S }, &m_SaveFile },
+            };
+            for (auto& m_Pair : m_Shortcuts)
+            {
+                ImGuiKey m_Key = m_Pair.first.second;
+                if (m_Key == ImGuiKey_None)
+                    m_Key = m_Pair.first.first;
+                else if (!ImGui::IsKeyDown(m_Pair.first.first))
+                    continue;
+
+                if (!ImGui::IsKeyPressed(m_Key, false))
+                    continue;
+
+                *m_Pair.second = true;
+            }
+        }
+
+        // Options
+        if (m_OpenFile)
+        {
+            // Example usage
+            std::string filePath = OpenFileDlg();
+            if (!filePath.empty()) {
+                // File selected, process it
+                g_FileHandler->ProcessFile(std::wstring(filePath.begin(), filePath.end()));
+            }
+            else {
+                // No file selected or dialog canceled
+                std::cout << "No file selected or dialog canceled." << std::endl;
+            }
+        }
+
+        ImGui::End();
+    }
+
+    void Render()
+    {
+        Base();
+        ImGui::Begin(g_TreeTitle);
+        {
+            RenderTree();
+        }
+        ImGui::End();
+
+        ImGui::Begin(g_PropertiesTitle);
+        {
+            RenderPropetries();
+        }
+        ImGui::End();
+
+        ImGui::Begin(g_HexEditorTitle);
+        {
+            RenderHex();
+        }
+        ImGui::End();
     }
 };
 
 class P3DHandler : public FileHandler {
 public:
     P3D p3d;
-
-    P3DHandler() 
+    P3DHandler()
     {
         g_LoadManager = new LoadManager();
 
@@ -407,58 +487,28 @@ public:
         g_LoadManager->PrintHandlers();
     }
 
-    void PrintP3DChunk(const std::vector<P3DChunk>& chunks, int depth = 0)
+    struct ChunkNode
     {
-        for (const auto& chunk : chunks)
-        {
-            // Print indentation based on depth
-            for (int i = 0; i < depth; ++i)
-                std::wcout << L"\t";
+        std::string FullPath;
+        std::string FileName;
+        std::vector<ChunkNode> Children;
+        bool IsDirectory;
+        int file_size;
+        std::streampos file_offset;
+        P3DChunk* chunk;
+        bool IsSelected;
+    };
 
-            std::wcout << L"**** Chunk ID: " << std::hex << chunk.header.data_type << std::endl;
+    ChunkNode* m_RootNode;
+    P3DChunk* m_selectedChunkNode;
 
-            // Print other chunk information
-            for (int i = 0; i < depth; ++i)
-                std::wcout << L"\t";
-
-            std::wcout << L"\t chunk_size: " << std::hex << chunk.header.chunk_size << std::endl;
-
-            for (int i = 0; i < depth; ++i)
-                std::wcout << L"\t";
-
-            std::wcout << L"\t sub_chunks_size: " << std::hex << chunk.header.sub_chunks_size << std::endl;
-
-            for (int i = 0; i < depth; ++i)
-                std::wcout << L"\t";
-
-            std::wcout << L"\t chunk offset: " << std::dec << chunk.file_offset << std::endl;
-
-            // Recursively print child chunks
-            if (!chunk.childs.empty())
-            {
-                std::wcout << std::endl;
-                PrintP3DChunk(chunk.childs, depth + 1);
-            }
-        }
-    }
-
-    void PrintP3DData()
+    void LoadFile(const std::wstring& filePath, int offset = -1)
     {
-        // Print header data
-        std::wcout << L"File ID: " << p3d.header.file_id << std::endl;
-        std::wcout << L"File size: " << p3d.header.file_size << std::endl;
-        std::wcout << L"File version: " << p3d.header.version << std::endl;
-
-        // Print chunks recursively
-        PrintP3DChunk(p3d.chunks);
-    }
-
-    void Load(const std::wstring& filePath, int offset = -1) override {
         std::wcout << L"Loading P3D file: " << filePath << std::endl;
 
         m_bFileLoaded = false;
 
-        if (offset == -1) m_workingFilePath = filePath;
+        if (offset == -1) m_LoadedFilePath = filePath;
 
         FILE* m_File = nullptr;
         errno_t err = _wfopen_s(&m_File, filePath.c_str(), L"rb");
@@ -480,7 +530,6 @@ public:
         // Read header
         fread(&p3d.header, sizeof(P3DHeader), 1, m_File);
 
-        m_bFileSelected = true;
         GetFileContent(filePath, (offset != -1) ? offset : 0, p3d.header.file_size);
 
         if (memcmp(p3d.header.file_id, "P3D", sizeof(p3d.header.file_id)) != 0) {
@@ -494,9 +543,7 @@ public:
         // Close the file
         fclose(m_File);
 
-        PrintP3DData();
-
-        m_RootNode = new DirectoryNode();
+        m_RootNode = new ChunkNode();
 
         m_RootNode->FullPath = (offset == -1) ? std::string(filePath.begin(), filePath.end()) : std::string(m_selectedFilePath.begin(), m_selectedFilePath.end());
         m_RootNode->FileName = m_RootNode->FullPath.substr(m_RootNode->FullPath.find_last_of('\\') + 1);
@@ -505,10 +552,11 @@ public:
         m_bFileLoaded = true;
     }
 
-    void CreateTreeNodesFromP3DChunks(const std::vector<P3DChunk>& chunks, DirectoryNode* parentNode) {
-        for (const auto& chunk : chunks) {
+    void CreateTreeNodesFromP3DChunks(const std::vector<P3DChunk>& chunks, ChunkNode* parentNode) 
+    {
+        for (P3DChunk chunk : chunks) {
             // Create file or directory node for the chunk
-            DirectoryNode node;
+            ChunkNode node;
 
             // Convert data_type to hexadecimal string and add chunk name
             std::stringstream ss;
@@ -518,6 +566,7 @@ public:
             node.FileName = ss.str();
             node.file_offset = chunk.file_offset;
             node.IsDirectory = (chunk.childs.size() > 0);
+            node.chunk = &chunk;
 
             // Add the node to the parent directory
             parentNode->Children.push_back(node);
@@ -529,237 +578,235 @@ public:
         }
     }
     
-    void DisplayDirectoryNode(DirectoryNode& parentNode)
+    void DisplayDirectoryNode(ChunkNode& chunkNode)
     {
-        if (&parentNode != nullptr)
+        ImGui::PushID(&chunkNode);
+
+        ImGuiTreeNodeFlags nodeFlags = 0;
+
+        if (chunkNode.IsSelected)
+            nodeFlags |= ImGuiTreeNodeFlags_Selected;
+
+        if (chunkNode.IsDirectory)
         {
-            ImGuiTreeNodeFlags nodeFlags = 0;
-
-            if (parentNode.IsSelected)
-                nodeFlags |= ImGuiTreeNodeFlags_Selected;
-
-            ImGui::PushID(&parentNode);
-
-            if (parentNode.IsDirectory)
+            if (ImGui::TreeNodeEx(chunkNode.FileName.c_str(), ImGuiTreeNodeFlags_SpanFullWidth | ImGuiTreeNodeFlags_OpenOnDoubleClick | nodeFlags))
             {
-                if (ImGui::TreeNodeEx(parentNode.FileName.c_str(),
-                    ImGuiTreeNodeFlags_SpanFullWidth |
-                    ImGuiTreeNodeFlags_OpenOnDoubleClick |
-                    nodeFlags))
-                {
-
-                    for (DirectoryNode& childNode : parentNode.Children)
-                        DisplayDirectoryNode(childNode);
-                    ImGui::TreePop();
-                }
-                // Handle selection logic
-                if (ImGui::IsItemClicked())
+                if (ImGui::IsItemClicked(0))
                 {
                     // Unselect all nodes first
                     UnselectAllNodes(*m_RootNode);
                     // Select the clicked node
-                    parentNode.IsSelected = true;
-                }
-            }
-            else
-            {
-                if (ImGui::TreeNodeEx(parentNode.FileName.c_str(),
-                    ImGuiTreeNodeFlags_NoTreePushOnOpen |
-                    ImGuiTreeNodeFlags_Leaf |
-                    ImGuiTreeNodeFlags_SpanFullWidth |
-                    nodeFlags))
-                {
-                    if (ImGui::IsItemClicked(0) && g_FileHandler->m_selectedFilePath != parentNode.FullPath)
-                    {
-                        // Unselect all nodes first
-                        UnselectAllNodes(*m_RootNode);
-                        // Select the clicked node
-                        parentNode.IsSelected = true;
+                    chunkNode.IsSelected = true;
 
-                        // handle click action
-                        g_FileHandler->m_bFileSelected = false;
-                        g_FileHandler->m_selectedFilePath = parentNode.FullPath;
-                        printf("Clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(parentNode.file_offset));
-                        g_FileHandler->m_bFileSelected = true;
-                    }
+                    g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
+                    printf("Clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
+                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.file_size);
+                }
+                for (ChunkNode& childNode : chunkNode.Children)
+                    DisplayDirectoryNode(childNode); // Pass by reference here
+                ImGui::TreePop();
+            }
+        }
+        else
+        {
+            if (ImGui::TreeNodeEx(chunkNode.FileName.c_str(), ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth | nodeFlags))
+            {
+
+                if (ImGui::IsItemClicked(0))
+                {
+                    // Unselect all nodes first
+                    UnselectAllNodes(*m_RootNode);
+                    // Select the clicked node
+                    chunkNode.IsSelected = true;
+
+                    g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
+                    printf("Clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
+                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.file_size);
+                    m_selectedChunkNode = chunkNode.chunk;
                 }
             }
-            ImGui::PopID();
         }
+        ImGui::PopID();
     }
 
-    void UnselectAllNodes(DirectoryNode& parentNode)
+    void UnselectAllNodes(ChunkNode& parentNode)
     {
         parentNode.IsSelected = false;
-        for (DirectoryNode& childNode : parentNode.Children)
+        for (ChunkNode& childNode : parentNode.Children)
             UnselectAllNodes(childNode);
     }
 
-    void RenderTree() 
+    void RenderTree()
     {
         if (g_FileHandler->m_bFileLoaded)
-            DisplayDirectoryNode(*g_FileHandler->m_RootNode);
+            DisplayDirectoryNode(*m_RootNode);
     }
 
-    void RenderPropetries() { }
+    void RenderPropetries()
+    {        
+        ObjectLoader* loader = g_LoadManager->GetHandler(m_selectedChunkNode->header.data_type);
+        if (loader) {
+            loader->LoadObject();
+        }
+        else {
+            // Handle case where no loader is found for the given chunk ID
+        }        
+    }
 
-    void RenderHex() 
+    void RenderHex()
     {
-        static MemoryEditor m_MemoryEdit;
-        m_MemoryEdit.DrawContents(m_selectedfileContent.data(), m_selectedFileSize);
     }
+
+    void Base()
+    {
+        ImGui::SetNextWindowPos({ 0.f, 0.f });
+        ImGui::SetNextWindowSize(g_ImGuiIO->DisplaySize);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f });
+
+        ImGui::Begin("##Base", nullptr, ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking | ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus);
+
+        ImGui::PopStyleVar(2);
+
+        ImGuiID m_DockSpaceID = ImGui::GetID("##BaseDockSpace");
+        ImGui::DockSpace(m_DockSpaceID, { 0.f, 0.f }, ImGuiDockNodeFlags_PassthruCentralNode);
+
+        static bool m_BuildDockSpace = true;
+        if (m_BuildDockSpace)
+        {
+            m_BuildDockSpace = false;
+            {
+                ImGui::DockBuilderDockWindow(g_TreeTitle, ImGui::DockBuilderSplitNode(m_DockSpaceID, ImGuiDir_Left, 0.45f, nullptr, nullptr));
+
+                ImGuiID m_PropertiesID = ImGui::DockBuilderSplitNode(m_DockSpaceID, ImGuiDir_None, 0.f, nullptr, nullptr);
+                ImGui::DockBuilderDockWindow(g_PropertiesTitle, m_PropertiesID);
+            }
+            ImGui::DockBuilderFinish(m_DockSpaceID);
+        }
+
+        bool m_OpenFile = false, m_SaveFile = false;
+
+        if (ImGui::BeginMenuBar())
+        {
+            if (ImGui::BeginMenu(u8"\uF15B File"))
+            {
+                if (ImGui::MenuItemEx("Open", u8"\uF56F", "CTRL + O"))
+                    m_OpenFile = true;
+
+
+                ImGui::EndMenu();
+            }
+        }
+
+        // Shortcuts
+        if (ImGui::GetCurrentContext()->OpenPopupStack.empty())
+        {
+            std::pair<std::pair<ImGuiKey, ImGuiKey>, bool*> m_Shortcuts[] =
+            {
+                { { ImGuiKey_LeftCtrl, ImGuiKey_O }, &m_OpenFile },
+                { { ImGuiKey_LeftCtrl, ImGuiKey_S }, &m_SaveFile },
+            };
+            for (auto& m_Pair : m_Shortcuts)
+            {
+                ImGuiKey m_Key = m_Pair.first.second;
+                if (m_Key == ImGuiKey_None)
+                    m_Key = m_Pair.first.first;
+                else if (!ImGui::IsKeyDown(m_Pair.first.first))
+                    continue;
+
+                if (!ImGui::IsKeyPressed(m_Key, false))
+                    continue;
+
+                *m_Pair.second = true;
+            }
+        }
+
+        // Options
+        if (m_OpenFile)
+        {
+            // Example usage
+            std::string filePath = OpenFileDlg();
+            if (!filePath.empty()) {
+                // File selected, process it
+                g_FileHandler->ProcessFile(std::wstring(filePath.begin(), filePath.end()));
+            }
+            else {
+                // No file selected or dialog canceled
+                std::cout << "No file selected or dialog canceled." << std::endl;
+            }
+        }
+
+        ImGui::End();
+    }
+
+    void Render()
+    {
+        Base();
+        ImGui::Begin(g_TreeTitle);
+        {
+            RenderTree();
+        }
+        ImGui::End();
+
+        ImGui::Begin(g_PropertiesTitle);
+        {
+            RenderPropetries();
+        }
+        ImGui::End();
+    }
+
 };
 
 class CSOHandler : public FileHandler {
 public:
-    void Load(const std::wstring& filePath, int offset = -1)  override {
-        std::wcout << "Loading CSO file: " << filePath << std::endl;
+    void LoadFile()
+    {
+        std::wcout << "Loading CSO file: " << std::endl;
         // Add CSO file loading logic here
     }
 
-    void RenderTree() { }
+    void RenderTree()
+    {
+    }
 
-    void RenderPropetries() { }
+    void RenderPropetries()
+    {
+    }
 
-    void RenderHex() { }
+    void RenderHex()
+    {
+    }
+
+    void Render()
+    {
+        printf("Render CSO Layout\n");
+    }
 };
 
-class BIKHandler : public FileHandler {
-public:
-    void Load(const std::wstring& filePath, int offset = -1)  override {
-        std::wcout << "Loading BIK file: " << filePath << std::endl;
-        // Add BIK file loading logic here
-    }
-
-    void RenderTree() { }
-
-    void RenderPropetries() { }
-
-    void RenderHex() { }
-};
-
-class RSDHandler : public FileHandler {
-public:
-    void Load(const std::wstring& filePath, int offset = -1)  override {
-        std::wcout << "Loading RSD file: " << filePath << std::endl;
-        // Add RSD file loading logic here
-    }
-
-    void RenderTree() { }
-
-    void RenderPropetries() { }
-
-    void RenderHex() { }
-};
-
-// Function to open a file dialog and return the selected file path
-std::string OpenFileDlg()
-{
-    console.log("OpenFileDlg()");
-    // Initialize the OPENFILENAMEA structure
-    static OPENFILENAMEA m_OpenFileName = { 0 };
-    char szFileName[MAX_PATH] = { 0 };
-
-    m_OpenFileName.lStructSize = sizeof(OPENFILENAMEA);
-    m_OpenFileName.lpstrFilter = "All Files\0*.*\0";
-    m_OpenFileName.lpstrFile = szFileName;
-    m_OpenFileName.nMaxFile = MAX_PATH;
-    m_OpenFileName.Flags = OFN_EXPLORER | OFN_FILEMUSTEXIST | OFN_HIDEREADONLY;
-
-    // Display the file dialog
-    if (GetOpenFileNameA(&m_OpenFileName)) {
-        return std::string(szFileName);
-    }
-    else {
-        return "";
-    }
-}
-
-std::wstring GetFileExtension(const std::wstring& filePath) {
-    size_t dotPos = filePath.find_last_of(L'.');
-    if (dotPos != std::wstring::npos) {
-        return filePath.substr(dotPos + 1);
-    }
-    return L""; // If no extension found
-}
-
-void ProcessFile(const std::wstring filePath, int offset = -1)
+void FileHandler::ProcessFile(const std::wstring filePath, int offset)
 {
     console.log((offset == -1) ? "ProcessFile() disk file!" : "ProcessFile() sub file!");
     std::wstring extension = L"";
-    std::string m_selectedFilePath = "";
+    std::string m_selectedFilePath = (offset != -1) ? g_FileHandler->m_selectedFilePath : "";
     std::wcout << "offset: " << offset << std::endl;
 
-    if (offset != -1)
-    {
-        m_selectedFilePath = g_FileHandler->m_selectedFilePath;
-        extension = GetFileExtension(g_FileHandler->StringToWideString(m_selectedFilePath));
-    }
-    else
-    {
-        extension = GetFileExtension(filePath);
-    }
-    FileHandler::eFileType type = FileHandler::GetFileType(extension);
-
+    extension = GetFileExtension(filePath);
     std::wcout << "File extension: " << extension << std::endl;
-    switch (type) {
-    case FileHandler::eFileType::RCF_FILE:
-        std::wcout << L"File type is RCF_FILE" << std::endl;
+
+    if (extension == L"rcf")
+    {
         g_FileHandler = std::make_unique<RCFHandler>();
-        break;
-    case FileHandler::eFileType::P3D_FILE:
-        std::wcout << L"File type is P3D_FILE" << std::endl;
+        g_FileHandler->m_LoadedFileType = FileHandler::eFileType::CSO_FILE;
+    }
+    if (extension == L"p3d")
+    {
         g_FileHandler = std::make_unique<P3DHandler>();
-        break;
-    case FileHandler::eFileType::RSD_FILE:
-        std::wcout << L"File type is RSD_FILE" << std::endl;
-        g_FileHandler = std::make_unique<RSDHandler>();
-        break;
-    case FileHandler::eFileType::CSO_FILE:
-        std::wcout << L"File type is CSO_FILE" << std::endl;
-        g_FileHandler = std::make_unique<CSOHandler>();
-        break;
-    case FileHandler::eFileType::BIK_FILE:
-        std::wcout << L"File type is BIK_FILE" << std::endl;
-        g_FileHandler = std::make_unique<BIKHandler>();
-        break;
-    case FileHandler::eFileType::FSC_FILE:
-        std::wcout << L"File type is FSC_FILE" << std::endl;
-        break;
-    case FileHandler::eFileType::UNK_FILE:
-        std::wcout << L"Unknown file type" << std::endl;
-        break;
+        g_FileHandler->m_LoadedFileType = FileHandler::eFileType::CSO_FILE;
     }
 
     if (g_FileHandler) {
         g_FileHandler->m_selectedFilePath = m_selectedFilePath;
-        g_FileHandler->Load(filePath, offset);
-    }
-}
-
-void RenderTree()
-{
-    if (g_FileHandler == nullptr) return;
-    if (g_FileHandler->m_bFileLoaded)
-    {
-        g_FileHandler->RenderTree();
-    }
-}
-
-void RenderPropetries()
-{
-    if (g_FileHandler == nullptr) return;
-    if (g_FileHandler->m_bFileLoaded && g_FileHandler->m_bFileSelected)
-    {
-        g_FileHandler->RenderPropetries();
-    }
-}
-
-void RenderHex()
-{
-    if (g_FileHandler == nullptr) return;
-    if (g_FileHandler->m_bFileLoaded && g_FileHandler->m_bFileSelected)
-    {
-        g_FileHandler->RenderHex();
+        g_FileHandler->LoadFile(filePath, offset);
     }
 }
