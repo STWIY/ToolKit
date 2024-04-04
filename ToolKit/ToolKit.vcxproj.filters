@@ -64,7 +64,7 @@
       <Filter>Project Files\3rdParty</Filter>
     </ClInclude>
     <ClInclude Include="FontAwesome.hxx" />
-    <ClInclude Include="FileHandler.hxx">
+    <ClInclude Include="filehandler.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
     <ClInclude Include="RCF.h">
@@ -76,7 +76,10 @@
     <ClInclude Include="P3D.h">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="texture.hxx">
+    <ClInclude Include="composeitedrawable.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="geometry.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
     <ClInclude Include="shader.hxx">
@@ -85,10 +88,18 @@
     <ClInclude Include="skeleton.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="composeitedrawable.hxx">
+    <ClInclude Include="texture.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="geometry.hxx">
+    <ClInclude Include="console.hxx" />
+    <ClInclude Include="chunkfile.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="loadstream.hxx">
+      <Filter>Project Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core.hxx" />
+    <ClInclude Include="loadmanager.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
   </ItemGroup>

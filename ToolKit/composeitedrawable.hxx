@@ -13,18 +13,27 @@ public:
 
 class CompositeDrawableLoader : public ObjectLoader
 {
-	void LoadObject(FILE* m_File) override
+	CompositeDrawable* compositedrawable = nullptr;
+	void LoadObject(ChunkFile* f) override
 	{
-		CompositeDrawable* compositedrawable = LoadCompositeDrawable(m_File);
+		compositedrawable = LoadCompositeDrawable(f);
 		if (compositedrawable) {
 			printf("Loaded compositedrawable %s\n");
 		}
 	}
 
-	CompositeDrawable* LoadCompositeDrawable(FILE* m_File)
+	CompositeDrawable* LoadCompositeDrawable(ChunkFile* f)
 	{
-		CompositeDrawable* compositedrawable = nullptr;
+		compositedrawable = nullptr;
 
 		return compositedrawable;
+	}
+
+	void RenderObject() override
+	{
+		if (compositedrawable == nullptr) return;
+		ImGui::Begin("Compositedrawable Information");
+
+		ImGui::End();
 	}
 };

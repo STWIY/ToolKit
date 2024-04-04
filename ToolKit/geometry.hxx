@@ -13,19 +13,28 @@ public:
 
 class GeometryLoader : public ObjectLoader
 {
-	void LoadObject(FILE* m_File) override
+	Geometry* geometry = nullptr;
+	void LoadObject(ChunkFile* f) override
 	{
-		Geometry* geometry = LoadGeometry(m_File);
+		geometry = LoadGeometry(f);
 		if (geometry) {
 			printf("Loaded geometry %s\n");
 		}
 	}
 
-	Geometry* LoadGeometry(FILE* m_File)
+	Geometry* LoadGeometry(ChunkFile* f)
 	{
-		Geometry* geometry = nullptr;
+		geometry = nullptr;
 
 
 		return geometry;
+	}
+
+	void RenderObject() override
+	{
+		if (geometry == nullptr) return;
+		ImGui::Begin("Geometry Information");
+
+		ImGui::End();
 	}
 };

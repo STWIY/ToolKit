@@ -129,7 +129,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)\ToolKit\3rdParty\ImGui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
@@ -160,11 +160,16 @@
     <ClInclude Include="3rdParty\ImGui\imstb_rectpack.h" />
     <ClInclude Include="3rdParty\ImGui\imstb_textedit.h" />
     <ClInclude Include="3rdParty\ImGui\imstb_truetype.h" />
+    <ClInclude Include="chunkfile.hxx" />
     <ClInclude Include="composeitedrawable.hxx" />
-    <ClInclude Include="FileHandler.hxx" />
+    <ClInclude Include="console.hxx" />
+    <ClInclude Include="core.hxx" />
+    <ClInclude Include="filehandler.hxx" />
     <ClInclude Include="FontAwesome.hxx" />
     <ClInclude Include="geometry.hxx" />
     <ClInclude Include="Helpers.hxx" />
+    <ClInclude Include="loadmanager.hxx" />
+    <ClInclude Include="loadstream.hxx" />
     <ClInclude Include="P3D.h" />
     <ClInclude Include="RCF.h" />
     <ClInclude Include="resource.h" />

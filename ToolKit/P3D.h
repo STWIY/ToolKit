@@ -4,6 +4,8 @@
 #include <vector>
 #include <cstdio>
 
+#include "chunkfile.hxx"
+
 #pragma pack(push, 1)
 
 struct P3DHeader 
@@ -25,77 +27,28 @@ struct P3DChunkHeader
 
 struct P3DChunk 
 {
+	uint64_t uniqueID;
     P3DChunkHeader header;
     std::vector<uint8_t> body;
     std::vector<P3DChunk> childs;
 	std::streampos file_offset;
 };
 
-class ObjectLoader 
-{
-public:
-	virtual void LoadObject(FILE* m_File) = 0;
-};
-
-class LoadManager 
-{
-	std::map<uint32_t, std::pair<ObjectLoader*, std::string>> objectHandlers;
-
-public:
-	void AddHandler(ObjectLoader* loader, uint32_t chunkId, std::string name) 
-	{
-		objectHandlers[chunkId] = std::make_pair(loader, name);
-	}
-
-	ObjectLoader* GetHandler(uint32_t chunkId) 
-	{
-		auto it = objectHandlers.find(chunkId);
-		if (it != objectHandlers.end()) {
-			return it->second.first;
-		}
-		return nullptr;
-	}
-
-	std::string GetName(uint32_t chunkId) 
-	{
-		auto it = objectHandlers.find(chunkId);
-		if (it != objectHandlers.end()) {
-			return it->second.second;
-		}
-		return "";
-	}
-
-	void PrintHandlers() 
-	{
-		std::cout << "Registered Handlers:" << std::endl;
-		for (const auto& pair : objectHandlers) {
-			std::cout << std::hex << "Chunk ID: " << pair.first << ", Name: " << pair.second.second << ", Handler Address: " << pair.second.first << std::endl;
-		}
-	}
-};
-
-LoadManager* g_LoadManager;
-
 class P3D 
 {
 public:
 	P3DHeader header;
 	std::vector<P3DChunk> chunks;
+	uint64_t currentID = 0;
 
 	P3DChunk ReadChunk(FILE* m_File) 
 	{
 		P3DChunk chunk;
+		chunk.uniqueID = currentID++;
 		chunk.file_offset = std::ftell(m_File);
 		fread(&chunk.header, sizeof(chunk.header), 1, m_File);
 		chunk.body.resize(chunk.header.chunk_size - sizeof(chunk.header));
 		fread(chunk.body.data(), chunk.body.size(), 1, m_File);
-
-		// Handle chunk loading using LoadManager
-		ObjectLoader* loader = g_LoadManager->GetHandler(chunk.header.data_type);
-		if (loader) {
-			//loader->LoadObject(m_File);
-		}
-
 		return chunk;
 	}
 
@@ -128,4 +81,33 @@ public:
 			}
 		}
 	}
+
+
+	void LoadFile(std::string filename)
+	{
+		LoadStream* stream = new LoadStream(filename.c_str());
+		if (stream == nullptr) {
+			printf("opening file %s\n", filename.c_str());
+			if (!stream->IsOpen()) {
+				fprintf(stderr, "couldn't open file %s\n", filename.c_str());
+				return;
+			}
+		}
+
+		ChunkFile cf(stream);
+		cf.SetName(filename.c_str());
+
+		while (cf.ChunksRemaining()) {
+			cf.BeginChunk();
+			ObjectLoader* loader = g_LoadManager->GetHandler(cf.GetCurrentID());
+			if (loader) {
+				loader->LoadObject(&cf);
+			}
+			else
+				0 && printf("no loader for chunk %X\n", cf.GetCurrentID());
+			//		ReadShit(&cf);
+			cf.EndChunk();
+		}
+	}
+
 };

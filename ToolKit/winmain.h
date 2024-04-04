@@ -38,7 +38,7 @@ HWND g_Window = nullptr;
 ImGuiIO* g_ImGuiIO = nullptr;
 
 // File handler
-#include "FileHandler.hxx"
+#include "filehandler.hxx"
 
 // Defines
 #define PROJECT_NAME        "Scarface Tool"

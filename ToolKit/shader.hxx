@@ -13,20 +13,28 @@ public:
 
 class ShaderLoader : public ObjectLoader
 {
-	void LoadObject(FILE* m_File) override
+	Shader* shader = nullptr;
+	void LoadObject(ChunkFile* f) override
 	{
-		printf("ShaderLoader::LoadObject()\n");
-		Shader* shader = LoadShader(m_File);
+		shader = LoadShader(f);
 		if (shader) {
 			printf("Loaded shader %s\n");
 		}
 	}
 
-	Shader* LoadShader(FILE* m_File)
+	Shader* LoadShader(ChunkFile* f)
 	{
-		Shader* shader = nullptr;
+		shader = nullptr;
 
 
 		return shader;
+	}
+
+	void RenderObject() override
+	{
+		if (shader == nullptr) return;
+		ImGui::Begin("Shader Information");
+
+		ImGui::End();
 	}
 };

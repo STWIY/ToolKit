@@ -13,19 +13,28 @@ public:
 
 class SkeletonLoader : public ObjectLoader
 {
-	void LoadObject(FILE* m_File) override
+	Skeleton* skeleton = nullptr;
+	void LoadObject(ChunkFile* f) override
 	{
-		Skeleton* skeleton = LoadSkeleton(m_File);
+		skeleton = LoadSkeleton(f);
 		if (skeleton) {
 			printf("Loaded skeleton %s\n");
 		}
 	}
 
-	Skeleton* LoadSkeleton(FILE* m_File)
+	Skeleton* LoadSkeleton(ChunkFile* f)
 	{
-		Skeleton* skeleton = nullptr;
+		skeleton = nullptr;
 
 
 		return skeleton;
+	}
+
+	void RenderObject() override
+	{
+		if (skeleton == nullptr) return;
+		ImGui::Begin("Skeleton Information");
+
+		ImGui::End();
 	}
 };

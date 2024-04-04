@@ -3,6 +3,11 @@
 #include <Windows.h>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
+#include <cerrno>
+
+#include "console.hxx"
+#include "loadmanager.hxx"
 
 #include "RCF.h"
 #include "P3D.h"
@@ -20,32 +25,11 @@
 #include "composeitedrawable.hxx"
 #include "skeleton.hxx"
 
-class Console {
-public:
-    Console() {
-        AllocConsole();
-        AttachConsole(GetCurrentProcessId());
-        freopen("CON", "w", stdout);
-        freopen("CON", "w", stderr);
-    }
-
-    ~Console() {
-        FreeConsole();
-    }
-
-    void log(const char* format, ...) const {
-        va_list args;
-        va_start(args, format);
-        vprintf(format, args);
-        va_end(args);
-        std::cout << std::endl;
-    }
-};
-
-Console console;
+ObjectLoader* loader;
 
 class FileHandler {
 public:
+    // File enumeration for each different supported file type
     enum eFileType
     {
         RCF_FILE,
@@ -57,25 +41,57 @@ public:
         UNK_FILE
     };
 
+    // Loaded file from disc
     eFileType m_LoadedFileType = eFileType::UNK_FILE;
+
+    // Loaded file path from disc
     std::wstring m_LoadedFilePath;
+
+    // Loaded file name
+    std::string m_LoadedFileName;
+
+    // Identifier if file has been loaded
     bool m_bFileLoaded = false;
 
+    // Selected file from the Tree nodes
     std::string m_selectedFilePath;
 
-    std::vector<char> m_selectedfileContent;
+    // Binary content of the selected file
+    std::vector<uint8_t> m_selectedfileContent;
     int m_selectedFileSize;
+
+    std::wstring m_savedFilePath;
 
     virtual void LoadFile(const std::wstring& filePath, int offset = -1) = 0;
 
     virtual void Render() = 0;
 
+    // Extract file name from string path
     std::string ExtractFileName(const std::string& filePath)
     {
         size_t found = filePath.find_last_of("/\\");
         if (found != std::string::npos) {
             return filePath.substr(found + 1);
         }
+        return filePath;
+    }
+
+    std::string ExtractFileNameWithoutExtension(const std::string& filePath)
+    {
+        size_t foundSlash = filePath.find_last_of("/\\");
+        size_t foundDot = filePath.find_last_of(".");
+
+        if (foundSlash != std::string::npos) {
+            if (foundDot != std::string::npos && foundDot > foundSlash) {
+                return filePath.substr(foundSlash + 1, foundDot - foundSlash - 1);
+            }
+            return filePath.substr(foundSlash + 1);
+        }
+
+        if (foundDot != std::string::npos) {
+            return filePath.substr(0, foundDot);
+        }
+
         return filePath;
     }
 
@@ -102,6 +118,7 @@ public:
         }
     }
 
+    // Extract file extension from string path
     std::wstring GetFileExtension(const std::wstring& filePath) {
         size_t dotPos = filePath.find_last_of(L'.');
         if (dotPos != std::wstring::npos) {
@@ -110,15 +127,19 @@ public:
         return L""; // If no extension found
     }
 
+    // Save binary data file into a temp file
     void SaveToTempFile(std::string fileName, int size)
     {
-        // Create a temporary file
+        if (m_selectedfileContent.empty()) return;
+
         std::filesystem::path tempDir = std::filesystem::temp_directory_path();
         std::filesystem::path tempFilePath = tempDir / fileName;
+
         FILE* tempFile = nullptr;
         errno_t err = fopen_s(&tempFile, tempFilePath.string().c_str(), "wb");
         if (err != 0 || tempFile == nullptr) {
-            std::cerr << "Failed to create temporary file!" << std::endl;
+            // Print detailed error message using errno and strerror
+            std::cerr << "Failed to create temporary file: " << strerror(errno) << std::endl;
             return;
         }
 
@@ -128,10 +149,11 @@ public:
         // Close the temporary file
         fclose(tempFile);
 
-        m_LoadedFilePath = tempDir / fileName;
-
+        m_savedFilePath = tempFilePath; // Assign the correct path
+        std::wcout << "Saved temp file in: " << m_savedFilePath << std::endl;
     }
 
+    // Gets from disc file using its path, offset and size the binary content of the file
     void GetFileContent(std::wstring filePath, int offset, int size)
     {
         // Read the content from the specified offset and size
@@ -156,17 +178,17 @@ public:
 
         // Close
         fclose(m_File);
-
-        SaveToTempFile(ExtractFileName(m_selectedFilePath).c_str(), size);
     }
 
+    // Default function used for each different handler
     void ProcessFile(const std::wstring filePath, int offset = -1);
 };
 
 std::unique_ptr<FileHandler> g_FileHandler;
 
 
-class RCFHandler : public FileHandler {
+class RCFHandler : public FileHandler 
+{
 public:
     RCF rcf;
 
@@ -309,8 +331,8 @@ public:
                 std::wstring wPath(path.begin(), path.end());
 
                 GetFileContent(g_FileHandler->m_LoadedFilePath, rcf.directory[index].fl_offset, rcf.directory[index].fl_size);
-
-                ProcessFile(g_FileHandler->m_LoadedFilePath);// , rcf.directory[index].fl_offset);
+                //SaveToTempFile()
+                //ProcessFile(g_FileHandler->m_LoadedFilePath);// , rcf.directory[index].fl_offset);
                 return true;
             }
             index++;
@@ -473,19 +495,6 @@ public:
 class P3DHandler : public FileHandler {
 public:
     P3D p3d;
-    P3DHandler()
-    {
-        g_LoadManager = new LoadManager();
-
-        g_LoadManager->AddHandler(new TextureLoader, Texture::TEXTURE, "TEXTURE");
-        g_LoadManager->AddHandler(new ShaderLoader, Shader::SHADER, "SHADER");
-        g_LoadManager->AddHandler(new GeometryLoader, Geometry::MESH, "MESH");
-        g_LoadManager->AddHandler(new CompositeDrawableLoader, CompositeDrawable::COMPOSITE_DRAWABLE, "COMPOSITE_DRAWABLE");
-        g_LoadManager->AddHandler(new SkeletonLoader, Skeleton::SKELETON, "SKELETON");
-
-        // Print all registered handlers
-        g_LoadManager->PrintHandlers();
-    }
 
     struct ChunkNode
     {
@@ -495,12 +504,23 @@ public:
         bool IsDirectory;
         int file_size;
         std::streampos file_offset;
-        P3DChunk* chunk;
+        P3DChunk chunk;
         bool IsSelected;
     };
 
     ChunkNode* m_RootNode;
-    P3DChunk* m_selectedChunkNode;
+    uint64_t m_selectedChunkId;
+
+    P3DHandler()
+    {
+        g_LoadManager = new LoadManager();
+
+        g_LoadManager->AddHandler(new TextureLoader, Texture::TEXTURE, "TEXTURE");
+        g_LoadManager->AddHandler(new ShaderLoader, Shader::SHADER, "SHADER");
+        g_LoadManager->AddHandler(new GeometryLoader, Geometry::MESH, "MESH");
+        g_LoadManager->AddHandler(new CompositeDrawableLoader, CompositeDrawable::COMPOSITE_DRAWABLE, "COMPOSITE_DRAWABLE");
+        g_LoadManager->AddHandler(new SkeletonLoader, Skeleton::SKELETON, "SKELETON");
+    }
 
     void LoadFile(const std::wstring& filePath, int offset = -1)
     {
@@ -509,6 +529,8 @@ public:
         m_bFileLoaded = false;
 
         if (offset == -1) m_LoadedFilePath = filePath;
+        
+        m_LoadedFileName = ExtractFileNameWithoutExtension(std::string(m_LoadedFilePath.begin(), m_LoadedFilePath.end()));
 
         FILE* m_File = nullptr;
         errno_t err = _wfopen_s(&m_File, filePath.c_str(), L"rb");
@@ -530,7 +552,7 @@ public:
         // Read header
         fread(&p3d.header, sizeof(P3DHeader), 1, m_File);
 
-        GetFileContent(filePath, (offset != -1) ? offset : 0, p3d.header.file_size);
+        //GetFileContent(filePath, (offset != -1) ? offset : 0, p3d.header.file_size);
 
         if (memcmp(p3d.header.file_id, "P3D", sizeof(p3d.header.file_id)) != 0) {
             std::wcerr << L"Error: Not a valid P3D archive." << std::endl;
@@ -550,6 +572,8 @@ public:
         m_RootNode->IsDirectory = true;
         CreateTreeNodesFromP3DChunks(p3d.chunks, m_RootNode);
         m_bFileLoaded = true;
+
+        p3d.LoadFile(std::string(filePath.begin(), filePath.end()).c_str());
     }
 
     void CreateTreeNodesFromP3DChunks(const std::vector<P3DChunk>& chunks, ChunkNode* parentNode) 
@@ -560,13 +584,12 @@ public:
 
             // Convert data_type to hexadecimal string and add chunk name
             std::stringstream ss;
-            ss << std::hex << chunk.header.data_type << " - " << g_LoadManager->GetName(chunk.header.data_type);
-
+            ss << "(" << std::dec << chunk.uniqueID << ")" << std::hex << chunk.header.data_type << " - " << g_LoadManager->GetName(chunk.header.data_type);
             node.FullPath = ss.str();
             node.FileName = ss.str();
             node.file_offset = chunk.file_offset;
             node.IsDirectory = (chunk.childs.size() > 0);
-            node.chunk = &chunk;
+            node.chunk = chunk;
 
             // Add the node to the parent directory
             parentNode->Children.push_back(node);
@@ -576,6 +599,65 @@ public:
                 CreateTreeNodesFromP3DChunks(chunk.childs, &parentNode->Children.back());
             }
         }
+    }
+
+    void PrintHexViewer(const std::vector<uint8_t>& data)
+    {
+        const int bytesPerLine = 16;
+
+        for (size_t i = 0; i < data.size(); i += bytesPerLine)
+        {
+            // Print the address for this line
+            std::cout << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
+
+            // Print bytes in hexadecimal format
+            for (int j = 0; j < bytesPerLine; ++j)
+            {
+                if (i + j < data.size())
+                {
+                    std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(data[i + j]) << " ";
+                }
+                else
+                {
+                    // Padding for incomplete lines
+                    std::cout << "   ";
+                }
+            }
+
+            // Print ASCII representation
+            std::cout << " | ";
+            for (int j = 0; j < bytesPerLine && i + j < data.size(); ++j)
+            {
+                uint8_t c = data[i + j];
+                // Printable ASCII characters
+                if (c >= 32 && c <= 126)
+                {
+                    std::cout << static_cast<char>(c);
+                }
+                else
+                {
+                    std::cout << '.';
+                }
+            }
+
+            std::cout << std::endl;
+        }
+    }
+
+    void LoadChunkContent(P3DChunk chunk)
+    {
+        if (m_selectedfileContent.size() == 0) return;
+        std::string path = std::string(m_savedFilePath.begin(), m_savedFilePath.end());
+        printf("LoadChunkContent file: %s\n", path.c_str());
+
+        LoadStream * stream = new LoadStream(path.c_str());
+        ChunkFile cf(stream, true);
+
+        loader = g_LoadManager->GetHandler(chunk.header.data_type);
+        if (loader) {
+            loader->LoadObject(&cf);
+        }
+        stream->Close();
     }
     
     void DisplayDirectoryNode(ChunkNode& chunkNode)
@@ -599,8 +681,12 @@ public:
                     chunkNode.IsSelected = true;
 
                     g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
-                    printf("Clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
-                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.file_size);
+                    printf("Parent clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
+                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.chunk_size);
+                    //PrintHexViewer(m_selectedfileContent);
+                    SaveToTempFile("chunk.p3d", chunkNode.chunk.header.chunk_size);
+                    LoadChunkContent(chunkNode.chunk);
+                    m_selectedChunkId = chunkNode.chunk.header.data_type;
                 }
                 for (ChunkNode& childNode : chunkNode.Children)
                     DisplayDirectoryNode(childNode); // Pass by reference here
@@ -611,7 +697,6 @@ public:
         {
             if (ImGui::TreeNodeEx(chunkNode.FileName.c_str(), ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_SpanFullWidth | nodeFlags))
             {
-
                 if (ImGui::IsItemClicked(0))
                 {
                     // Unselect all nodes first
@@ -620,9 +705,12 @@ public:
                     chunkNode.IsSelected = true;
 
                     g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
-                    printf("Clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
-                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.file_size);
-                    m_selectedChunkNode = chunkNode.chunk;
+                    printf("Children clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
+                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.chunk_size);
+                    //PrintHexViewer(m_selectedfileContent);
+                    SaveToTempFile("chunk.p3d", chunkNode.chunk.header.chunk_size);
+                    LoadChunkContent(chunkNode.chunk);
+                    m_selectedChunkId = chunkNode.chunk.header.data_type;
                 }
             }
         }
@@ -643,14 +731,17 @@ public:
     }
 
     void RenderPropetries()
-    {        
-        ObjectLoader* loader = g_LoadManager->GetHandler(m_selectedChunkNode->header.data_type);
-        if (loader) {
-            loader->LoadObject();
+    {
+        switch (m_selectedChunkId)
+        {
+            case Texture::TEXTURE:
+            {
+                if (loader) {
+                    loader->RenderObject();
+                }
+                break;
+            }
         }
-        else {
-            // Handle case where no loader is found for the given chunk ID
-        }        
     }
 
     void RenderHex()
