@@ -6,11 +6,11 @@
 #include <iomanip>
 #include <cerrno>
 
-#include "console.hxx"
-#include "loadmanager.hxx"
+#include "Console.hxx"
+#include "p3d/LoadManager.hxx"
 
 #include "RCF.h"
-#include "P3D.h"
+#include "p3d/P3D.h"
 
 // 3rdParty (ImGui)
 #include "3rdParty/ImGui/imgui.h"
@@ -19,11 +19,11 @@
 #include "3rdParty/ImGui/imgui_impl_dx11.h"
 #include "3rdParty/ImGui/imgui_memory_editor.h"
 
-#include "texture.hxx"
-#include "shader.hxx"
-#include "geometry.hxx"
-#include "composeitedrawable.hxx"
-#include "skeleton.hxx"
+#include "p3d/Texture.hxx"
+#include "p3d/Shader.hxx"
+#include "p3d/Geometry.hxx"
+#include "p3d/ComposeiteDrawable.hxx"
+#include "p3d/Skeleton.hxx"
 
 ObjectLoader* loader;
 
@@ -98,7 +98,6 @@ public:
     // Function to open a file dialog and return the selected file path
     std::string OpenFileDlg()
     {
-        console.log("OpenFileDlg()");
         // Initialize the OPENFILENAMEA structure
         static OPENFILENAMEA m_OpenFileName = { 0 };
         char szFileName[MAX_PATH] = { 0 };
@@ -150,7 +149,6 @@ public:
         fclose(tempFile);
 
         m_savedFilePath = tempFilePath; // Assign the correct path
-        std::wcout << "Saved temp file in: " << m_savedFilePath << std::endl;
     }
 
     // Gets from disc file using its path, offset and size the binary content of the file
@@ -492,9 +490,17 @@ public:
     }
 };
 
-class P3DHandler : public FileHandler {
+class P3DHandler : public FileHandler 
+{
 public:
     P3D p3d;
+
+    enum eDisplayMode
+    {
+        DEFAULT,
+        VALUES,
+        HEX
+    };
 
     struct ChunkNode
     {
@@ -506,10 +512,12 @@ public:
         std::streampos file_offset;
         P3DChunk chunk;
         bool IsSelected;
+        eDisplayMode displayMode = eDisplayMode::DEFAULT;
+        uint64_t parentID;
     };
 
     ChunkNode* m_RootNode;
-    uint64_t m_selectedChunkId;
+    ChunkNode* m_selectedChunkNode;
 
     P3DHandler()
     {
@@ -573,7 +581,7 @@ public:
         CreateTreeNodesFromP3DChunks(p3d.chunks, m_RootNode);
         m_bFileLoaded = true;
 
-        p3d.LoadFile(std::string(filePath.begin(), filePath.end()).c_str());
+        //p3d.LoadFile(std::string(filePath.begin(), filePath.end()).c_str());
     }
 
     void CreateTreeNodesFromP3DChunks(const std::vector<P3DChunk>& chunks, ChunkNode* parentNode) 
@@ -590,7 +598,7 @@ public:
             node.file_offset = chunk.file_offset;
             node.IsDirectory = (chunk.childs.size() > 0);
             node.chunk = chunk;
-
+            node.parentID = parentNode->chunk.uniqueID;
             // Add the node to the parent directory
             parentNode->Children.push_back(node);
 
@@ -598,66 +606,85 @@ public:
             if (chunk.childs.size() > 0) {
                 CreateTreeNodesFromP3DChunks(chunk.childs, &parentNode->Children.back());
             }
+            else {
+                node.parentID = NULL;
+            }
         }
     }
 
-    void PrintHexViewer(const std::vector<uint8_t>& data)
+    uint64_t FindTopParentID(ChunkNode& node)
     {
-        const int bytesPerLine = 16;
+        if (node.parentID == 0) {
+            // This is the top parent node
+            return node.chunk.uniqueID;
+        }
+        else {
+            // Recursively call the function with the parent node
+            ChunkNode* parentNode = FindParentNode(node.parentID);
+            if (parentNode != nullptr) {
+                return FindTopParentID(*parentNode);
+            }
+            else {
+                // If parent node is not found, return the current node's unique ID
+                return node.chunk.uniqueID;
+            }
+        }
+    }
 
-        for (size_t i = 0; i < data.size(); i += bytesPerLine)
+    ChunkNode* FindParentNode(uint64_t parentID)
+    {
+        // Traverse the tree to find the node with the given parentID
+        return FindParentNodeRecursive(m_RootNode, parentID);
+    }
+
+    ChunkNode* FindParentNodeRecursive(ChunkNode* currentNode, uint64_t parentID)
+    {
+        if (currentNode->chunk.uniqueID == parentID) {
+            // Found the node with the given parentID
+            return currentNode;
+        }
+
+        // Recursively search in the children nodes
+        for (auto& child : currentNode->Children) {
+            ChunkNode* foundNode = FindParentNodeRecursive(&child, parentID);
+            if (foundNode != nullptr) {
+                return foundNode;
+            }
+        }
+
+        // If not found in children, return nullptr
+        return nullptr;
+    }
+
+    void LoadChunkContent(ChunkNode chunkNode)
+    {
+        uint64_t topParent = FindTopParentID(chunkNode);
+        if (topParent)
         {
-            // Print the address for this line
-            std::cout << std::hex << std::setw(8) << std::setfill('0') << i << ": ";
-
-            // Print bytes in hexadecimal format
-            for (int j = 0; j < bytesPerLine; ++j)
+            printf("***** Top parent id: %d\n", topParent);
+            ChunkNode* node = FindParentNode(topParent);
+            if (node->chunk.uniqueID>0)
             {
-                if (i + j < data.size())
+                printf("\t - Node id: %d\n", node->chunk.header.data_type);
+                GetFileContent(g_FileHandler->m_LoadedFilePath, node->file_offset, node->chunk.header.sub_chunks_size);
+                SaveToTempFile("chunk.p3d", node->chunk.header.sub_chunks_size);
+                P3DChunk* chunk = p3d.GetChunkByID(&p3d.chunks, topParent);
+                if (chunk != nullptr)
                 {
-                    std::cout << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(data[i + j]) << " ";
-                }
-                else
-                {
-                    // Padding for incomplete lines
-                    std::cout << "   ";
+                    if (m_selectedfileContent.size() == 0) return;
+                    std::string path = std::string(m_savedFilePath.begin(), m_savedFilePath.end());
+                    LoadStream* stream = new LoadStream(path.c_str());
+                    ChunkFile cf(stream, true);
+                    loader = g_LoadManager->GetHandler(chunk->header.data_type);
+                    if (loader) {
+                        printf("***** Loading object id: %d - and render props of %d\n", chunk->header.data_type, chunkNode.chunk.uniqueID);
+                        loader->LoadObject(&cf);
+                    }
+                    stream->Close();
                 }
             }
-
-            // Print ASCII representation
-            std::cout << " | ";
-            for (int j = 0; j < bytesPerLine && i + j < data.size(); ++j)
-            {
-                uint8_t c = data[i + j];
-                // Printable ASCII characters
-                if (c >= 32 && c <= 126)
-                {
-                    std::cout << static_cast<char>(c);
-                }
-                else
-                {
-                    std::cout << '.';
-                }
-            }
-
-            std::cout << std::endl;
+            
         }
-    }
-
-    void LoadChunkContent(P3DChunk chunk)
-    {
-        if (m_selectedfileContent.size() == 0) return;
-        std::string path = std::string(m_savedFilePath.begin(), m_savedFilePath.end());
-        printf("LoadChunkContent file: %s\n", path.c_str());
-
-        LoadStream * stream = new LoadStream(path.c_str());
-        ChunkFile cf(stream, true);
-
-        loader = g_LoadManager->GetHandler(chunk.header.data_type);
-        if (loader) {
-            loader->LoadObject(&cf);
-        }
-        stream->Close();
     }
     
     void DisplayDirectoryNode(ChunkNode& chunkNode)
@@ -681,12 +708,10 @@ public:
                     chunkNode.IsSelected = true;
 
                     g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
-                    printf("Parent clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
-                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.chunk_size);
-                    //PrintHexViewer(m_selectedfileContent);
-                    SaveToTempFile("chunk.p3d", chunkNode.chunk.header.chunk_size);
-                    LoadChunkContent(chunkNode.chunk);
-                    m_selectedChunkId = chunkNode.chunk.header.data_type;
+                    //GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.sub_chunks_size);
+                    //SaveToTempFile("chunk.p3d", chunkNode.chunk.header.sub_chunks_size);
+                    LoadChunkContent(chunkNode);
+                    m_selectedChunkNode = &chunkNode;
                 }
                 for (ChunkNode& childNode : chunkNode.Children)
                     DisplayDirectoryNode(childNode); // Pass by reference here
@@ -705,12 +730,10 @@ public:
                     chunkNode.IsSelected = true;
 
                     g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
-                    printf("Children clicked file: %s %lld\n", g_FileHandler->m_selectedFilePath.c_str(), static_cast<long long>(chunkNode.file_offset));
-                    GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.chunk_size);
-                    //PrintHexViewer(m_selectedfileContent);
-                    SaveToTempFile("chunk.p3d", chunkNode.chunk.header.chunk_size);
-                    LoadChunkContent(chunkNode.chunk);
-                    m_selectedChunkId = chunkNode.chunk.header.data_type;
+                    //GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.sub_chunks_size);
+                    //SaveToTempFile("chunk.p3d", chunkNode.chunk.header.sub_chunks_size);
+                    LoadChunkContent(chunkNode);
+                    m_selectedChunkNode = &chunkNode;
                 }
             }
         }
@@ -730,22 +753,63 @@ public:
             DisplayDirectoryNode(*m_RootNode);
     }
 
+    void DisplayModeSelector(eDisplayMode& currentMode) {
+        const char* items[] = { 
+            "Default", 
+            "Values", 
+            "Hex" 
+        };
+        int currentItem = static_cast<int>(currentMode);
+        if (ImGui::BeginCombo("Display Mode", items[currentItem])) {
+            for (int i = 0; i < IM_ARRAYSIZE(items); i++) {
+                const bool isSelected = (currentItem == i);
+                if (ImGui::Selectable(items[i], isSelected))
+                    currentMode = static_cast<eDisplayMode>(i);
+
+                if (isSelected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+    }
+
     void RenderPropetries()
     {
-        switch (m_selectedChunkId)
+        if (m_selectedChunkNode != nullptr)
         {
-            case Texture::TEXTURE:
+            DisplayModeSelector(m_selectedChunkNode->displayMode);
+            switch (m_selectedChunkNode->displayMode)
             {
-                if (loader) {
-                    loader->RenderObject();
+                case eDisplayMode::DEFAULT:
+                {
+                    ImGui::Text("DEFAULT-");
+                    break;
                 }
-                break;
+                case eDisplayMode::VALUES:
+                {
+                    ImGui::Text("VALUES- %d", m_selectedChunkNode->chunk.header.data_type);
+                    if (loader) {
+                        loader->RenderObject(m_selectedChunkNode->chunk.header.data_type);
+                    }
+                    break;
+                }
+                case eDisplayMode::HEX:
+                {
+                    ImGui::Text("HEX-");
+                    RenderHex();
+                    break;
+                }
             }
         }
     }
 
     void RenderHex()
     {
+        if (m_selectedfileContent.size() > 0)
+        {
+            static MemoryEditor m_MemoryEdit;
+            m_MemoryEdit.DrawContents(m_selectedfileContent.data(), m_selectedFileSize);
+        }
     }
 
     void Base()
@@ -849,7 +913,8 @@ public:
 
 };
 
-class CSOHandler : public FileHandler {
+class CSOHandler : public FileHandler 
+{
 public:
     void LoadFile()
     {

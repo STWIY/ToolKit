@@ -30,7 +30,7 @@ class SkeletonLoader : public ObjectLoader
 		return skeleton;
 	}
 
-	void RenderObject() override
+	void RenderObject(int type) override
 	{
 		if (skeleton == nullptr) return;
 		ImGui::Begin("Skeleton Information");

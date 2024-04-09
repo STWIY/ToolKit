@@ -36,15 +36,16 @@ const char* g_HexEditorTitle = u8"\uE33B Hex Editor";
 // Globals
 HWND g_Window = nullptr;
 ImGuiIO* g_ImGuiIO = nullptr;
+static ID3D11Device* g_Device = nullptr;
 
 // File handler
-#include "filehandler.hxx"
+#include "FileHandler.hxx"
 
 // Defines
 #define PROJECT_NAME        "Scarface Tool"
 
 // Resources
-#include "resource.h"
+#include "Resource.h"
 #include "FontAwesome.hxx"
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow);

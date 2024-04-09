@@ -1,13 +1,13 @@
 #pragma once
-#include "core.hxx"
-#include "loadstream.hxx"
+
+#include "LoadStream.hxx"
 
 #include <string.h>
 #include <assert.h>
 
 struct Chunk
 {
-	u32 id, dataLength, chunkLength, startPosition;
+	uint32_t id, dataLength, chunkLength, startPosition;
 };
 
 class ChunkFile
@@ -22,7 +22,7 @@ public:
 	ChunkFile(LoadStream* f, bool skip_header = false) : stackTop(-1)
 	{
 		realFile = f;
-		u32 id = realFile->GetU32();
+		uint32_t id = realFile->GetU32();
 		printf("Chunk %08X\n", id);
 
 		if (id != 0xFF443350 && !skip_header) {
@@ -41,13 +41,13 @@ public:
 
 	void indent(int n) { while (n--) putchar(' '); }
 
-	u32 BeginChunk(void)
+	uint32_t BeginChunk(void)
 	{
 		stackTop++;
 
 		// skip end to end of chunk
 		if (stackTop != 0) {
-			u32 start = chunkStack[stackTop - 1].startPosition + chunkStack[stackTop - 1].dataLength;
+			uint32_t start = chunkStack[stackTop - 1].startPosition + chunkStack[stackTop - 1].dataLength;
 			if (realFile->GetPosition() < start)
 				realFile->Advance(start - realFile->GetPosition());
 		}
@@ -61,7 +61,7 @@ public:
 		return chunkStack[stackTop].id;
 	}
 
-	u32 BeginChunk(u32 chunkID)
+	uint32_t BeginChunk(uint32_t chunkID)
 	{
 		stackTop++;
 		chunkStack[stackTop].startPosition = realFile->GetPosition() - 4;
@@ -76,13 +76,13 @@ public:
 
 	void EndChunk(void)
 	{
-		u32 start = chunkStack[stackTop].startPosition;
-		u32 chunkLength = chunkStack[stackTop].chunkLength;
+		uint32_t start = chunkStack[stackTop].startPosition;
+		uint32_t chunkLength = chunkStack[stackTop].chunkLength;
 		realFile->Advance(start + chunkLength - realFile->GetPosition());
 		stackTop--;
 	}
 
-	u32 GetCurrentID(void)
+	uint32_t GetCurrentID(void)
 	{
 		return chunkStack[stackTop].id;
 	}
@@ -104,14 +104,14 @@ public:
 
 	const char *GetName(void) { return filename; }
 
-	void GetData(void *buf, u32 count, u32 sz = 1) { realFile->GetData(buf, count, sz); }
-	u8 GetU8(void) { return realFile->GetU8(); }
-	u16 GetU16(void) { return realFile->GetU16(); }
-	u32 GetU32(void) { return realFile->GetU32(); }
-	i8 GetI8(void) { return realFile->GetI8(); }
-	i16 GetI16(void) { return realFile->GetI16(); }
-	i32 GetI32(void) { return realFile->GetI32(); }
+	void GetData(void *buf, uint32_t count, uint32_t sz = 1) { realFile->GetData(buf, count, sz); }
+	uint8_t GetU8(void) { return realFile->GetU8(); }
+	uint16_t GetU16(void) { return realFile->GetU16(); }
+	uint32_t GetU32(void) { return realFile->GetU32(); }
+	int8_t GetI8(void) { return realFile->GetI8(); }
+	int16_t GetI16(void) { return realFile->GetI16(); }
+	int32_t GetI32(void) { return realFile->GetI32(); }
 	float GetFloat(void) { return realFile->GetFloat(); }
-	char *GetString(char *s) { u8 tmp = GetU8(); realFile->GetData(s, tmp); s[tmp] = '\0'; return s; }
-	char *GetLString(char *s) { u32 tmp = GetU32(); realFile->GetData(s, tmp+1); return s; }
+	char *GetString(char *s) { uint8_t tmp = GetU8(); realFile->GetData(s, tmp); s[tmp] = '\0'; return s; }
+	char *GetLString(char *s) { uint32_t tmp = GetU32(); realFile->GetData(s, tmp+1); return s; }
 };

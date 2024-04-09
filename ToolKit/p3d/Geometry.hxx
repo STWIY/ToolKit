@@ -30,7 +30,7 @@ class GeometryLoader : public ObjectLoader
 		return geometry;
 	}
 
-	void RenderObject() override
+	void RenderObject(int type) override
 	{
 		if (geometry == nullptr) return;
 		ImGui::Begin("Geometry Information");

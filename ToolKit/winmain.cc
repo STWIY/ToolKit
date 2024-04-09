@@ -1,4 +1,4 @@
-#include "winmain.h"
+#include "WinMain.h"
 
 const char* g_PopupErrorTitle = u8"\uF06A Error";
 
@@ -78,7 +78,7 @@ namespace Render
         if (g_FileHandler != nullptr)
         {
             // Render different layouts based on file type
-            if (g_FileHandler->m_LoadedFileType != FileHandler::eFileType::UNK_FILE && g_FileHandler->m_bFileLoaded)
+            if (g_FileHandler->m_bFileLoaded)
                 g_FileHandler->Render();
         }
         else 
@@ -91,7 +91,6 @@ namespace Render
 // DirectX
 namespace DirectX
 {
-    static ID3D11Device* m_Device = nullptr;
     static ID3D11DeviceContext* m_DeviceCtx = nullptr;
     static IDXGISwapChain* m_SwapChain = nullptr;
     static ID3D11RenderTargetView* m_RenderTargetView = nullptr;
@@ -133,7 +132,7 @@ namespace DirectX
         ID3D11Texture2D* m_BackBufferTexture;
         m_SwapChain->GetBuffer(0, IID_PPV_ARGS(&m_BackBufferTexture));
 
-        m_Device->CreateRenderTargetView(m_BackBufferTexture, nullptr, &m_RenderTargetView);
+        g_Device->CreateRenderTargetView(m_BackBufferTexture, nullptr, &m_RenderTargetView);
         m_BackBufferTexture->Release();
     }
 
@@ -158,7 +157,7 @@ namespace DirectX
 
         const D3D_FEATURE_LEVEL m_FeatureLevels[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0 };
         D3D_FEATURE_LEVEL m_FeatureLevelDummy;
-        HRESULT m_Result = D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, 0, m_FeatureLevels, ARRAYSIZE(m_FeatureLevels), D3D11_SDK_VERSION, &m_SwapChainDesc, &m_SwapChain, &m_Device, &m_FeatureLevelDummy, &m_DeviceCtx);
+        HRESULT m_Result = D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, 0, m_FeatureLevels, ARRAYSIZE(m_FeatureLevels), D3D11_SDK_VERSION, &m_SwapChainDesc, &m_SwapChain, &g_Device, &m_FeatureLevelDummy, &m_DeviceCtx);
         if (m_Result != S_OK)
             return false;
 
@@ -300,7 +299,7 @@ int WINAPI WinMain(HINSTANCE p_Instance, HINSTANCE p_PrevInstance, char* p_CmdLi
     ImGui::InitializeFonts();
 
     ImGui_ImplWin32_Init(g_Window);
-    ImGui_ImplDX11_Init(DirectX::m_Device, DirectX::m_DeviceCtx);
+    ImGui_ImplDX11_Init(g_Device, DirectX::m_DeviceCtx);
 
     bool m_Quit = false;
     while (!m_Quit)

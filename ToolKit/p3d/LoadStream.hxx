@@ -1,5 +1,4 @@
 #pragma once
-#include "core.hxx"
 
 #include <stdio.h>
 #include <assert.h>
@@ -32,34 +31,34 @@ public:
 			fclose(fp);
 	}
 
-	bool GetData(void* buf, u32 count, u32 sz = 1)
+	bool GetData(void* buf, uint32_t count, uint32_t sz = 1)
 	{
 		return fread(buf, sz, count, fp) == count;
 	}
 
-	u32 GetSize(void)
+	uint32_t GetSize(void)
 	{
 		assert(0);
 		return 0;
 	}
 
-	u32 GetPosition(void)
+	uint32_t GetPosition(void)
 	{
 		return ftell(fp);
 	}
 
-	void Advance(u32 skip)
+	void Advance(uint32_t skip)
 	{
 		fseek(fp, skip, SEEK_CUR);
 	}
 
 	bool IsOpen(void) { return fp != nullptr; }
 
-	u8 GetU8(void) { u8 tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
-	u16 GetU16(void) { u16 tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
-	u32 GetU32(void) { u32 tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
-	i8 GetI8(void) { i8 tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
-	i16 GetI16(void) { i16 tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
-	i32 GetI32(void) { i32 tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
+	uint8_t GetU8(void) { uint8_t tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
+	uint16_t GetU16(void) { uint16_t tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
+	uint32_t GetU32(void) { uint32_t tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
+	int8_t GetI8(void) { int8_t tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
+	int16_t GetI16(void) { int16_t tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
+	int32_t GetI32(void) { int32_t tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
 	float GetFloat(void) { float tmp; GetData(&tmp, 1, sizeof(tmp)); return tmp; }
 };

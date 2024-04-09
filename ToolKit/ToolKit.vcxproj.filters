@@ -7,9 +7,15 @@
     <Filter Include="Project Files\3rdParty">
       <UniqueIdentifier>{0ea7a4c9-e33d-4bdd-9dd1-660975cf3ee5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Project Files\p3d">
+      <UniqueIdentifier>{c5841470-3f13-4453-95c3-b53bece54aa3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\p3d\lodepng">
+      <UniqueIdentifier>{7d326a09-ae96-4639-a4d0-254888a1c343}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="winmain.cc">
+    <ClCompile Include="WinMain.cc">
       <Filter>Project Files</Filter>
     </ClCompile>
     <ClCompile Include="3rdParty\ImGui\imgui.cpp">
@@ -30,12 +36,14 @@
     <ClCompile Include="3rdParty\ImGui\imgui_widgets.cpp">
       <Filter>Project Files\3rdParty</Filter>
     </ClCompile>
+    <ClCompile Include="p3d\lodepng\lodepng.cpp">
+      <Filter>Project Files\p3d\lodepng</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="winmain.h">
+    <ClInclude Include="WinMain.h">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="resource.h" />
     <ClInclude Include="3rdParty\ImGui\imconfig.h">
       <Filter>Project Files\3rdParty</Filter>
     </ClInclude>
@@ -63,8 +71,7 @@
     <ClInclude Include="3rdParty\ImGui\imstb_truetype.h">
       <Filter>Project Files\3rdParty</Filter>
     </ClInclude>
-    <ClInclude Include="FontAwesome.hxx" />
-    <ClInclude Include="filehandler.hxx">
+    <ClInclude Include="FileHandler.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
     <ClInclude Include="RCF.h">
@@ -73,40 +80,54 @@
     <ClInclude Include="Helpers.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="P3D.h">
+    <ClInclude Include="p3d\ChunkFile.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\ComposeiteDrawable.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\Geometry.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\P3D.h">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\Shader.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\Skeleton.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\Texture.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\LoadManager.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="p3d\LoadStream.hxx">
+      <Filter>Project Files\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="Console.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="composeitedrawable.hxx">
+    <ClInclude Include="FontAwesome.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="geometry.hxx">
+    <ClInclude Include="Resource.h">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="shader.hxx">
-      <Filter>Project Files</Filter>
-    </ClInclude>
-    <ClInclude Include="skeleton.hxx">
-      <Filter>Project Files</Filter>
-    </ClInclude>
-    <ClInclude Include="texture.hxx">
-      <Filter>Project Files</Filter>
-    </ClInclude>
-    <ClInclude Include="console.hxx" />
-    <ClInclude Include="chunkfile.hxx">
-      <Filter>Project Files</Filter>
-    </ClInclude>
-    <ClInclude Include="loadstream.hxx">
-      <Filter>Project Files</Filter>
-    </ClInclude>
-    <ClInclude Include="core.hxx" />
-    <ClInclude Include="loadmanager.hxx">
-      <Filter>Project Files</Filter>
+    <ClInclude Include="p3d\lodepng\lodepng.h">
+      <Filter>Project Files\p3d\lodepng</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="ToolKit.rc" />
+    <Image Include="icon1.ico">
+      <Filter>Project Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="icon1.ico" />
+    <ResourceCompile Include="ToolKit.rc">
+      <Filter>Project Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

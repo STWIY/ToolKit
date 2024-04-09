@@ -29,7 +29,7 @@ class CompositeDrawableLoader : public ObjectLoader
 		return compositedrawable;
 	}
 
-	void RenderObject() override
+	void RenderObject(int type) override
 	{
 		if (compositedrawable == nullptr) return;
 		ImGui::Begin("Compositedrawable Information");

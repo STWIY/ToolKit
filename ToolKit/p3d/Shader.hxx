@@ -30,7 +30,7 @@ class ShaderLoader : public ObjectLoader
 		return shader;
 	}
 
-	void RenderObject() override
+	void RenderObject(int type) override
 	{
 		if (shader == nullptr) return;
 		ImGui::Begin("Shader Information");

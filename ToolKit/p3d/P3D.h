@@ -4,7 +4,7 @@
 #include <vector>
 #include <cstdio>
 
-#include "chunkfile.hxx"
+#include "ChunkFile.hxx"
 
 #pragma pack(push, 1)
 
@@ -39,7 +39,7 @@ class P3D
 public:
 	P3DHeader header;
 	std::vector<P3DChunk> chunks;
-	uint64_t currentID = 0;
+	uint64_t currentID = 1;
 
 	P3DChunk ReadChunk(FILE* m_File) 
 	{
@@ -82,6 +82,28 @@ public:
 		}
 	}
 
+	P3DChunk* GetChunkByID(std::vector<P3DChunk>* chunks, uint64_t chunkID)
+	{
+		for (auto& chunk : *chunks)
+		{
+			if (chunk.uniqueID == chunkID)
+			{
+				return &chunk;
+			}
+			else
+			{
+				if (!chunk.childs.empty())
+				{
+					P3DChunk* foundChunk = GetChunkByID(&chunk.childs, chunkID);
+					if (foundChunk != nullptr)
+					{
+						return foundChunk;
+					}
+				}
+			}
+		}
+		return nullptr; // Chunk with specified ID not found
+	}
 
 	void LoadFile(std::string filename)
 	{

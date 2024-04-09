@@ -1,13 +1,13 @@
 #include <vector>
 #include <iostream>
 
-#include "chunkfile.hxx"
+#include "ChunkFile.hxx"
 
 class ObjectLoader
 {
 public:
 	virtual void LoadObject(ChunkFile* f) = 0;
-	virtual void RenderObject() = 0;
+	virtual void RenderObject(int type = 0) = 0;
 };
 
 class LoadManager
