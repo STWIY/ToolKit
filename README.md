@@ -34,4 +34,5 @@ Feel free to contribute to this project by opening issues or submitting pull req
 
 - ImGui: The Bloat-Free Immediate Mode Graphical User interface library.
 - DirectX: A collection of APIs designed to support interactive multimedia applications.
+- [aap/scarface-p3d](https://github.com/aap/scarface-p3d) classes for handling p3d file content.
 - [Scarface: The World Is Yours](https://en.wikipedia.org/wiki/Scarface:_The_World_Is_Yours): A classic action-adventure game developed by [Radical Entertainment](https://en.wikipedia.org/wiki/Radical_Entertainment)https://en.wikipedia.org/wiki/Radical_Entertainment.
