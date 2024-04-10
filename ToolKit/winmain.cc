@@ -1,6 +1,13 @@
 #include "WinMain.h"
 
-const char* g_PopupErrorTitle = u8"\uF06A Error";
+using namespace DirectX;
+using namespace DirectX::SimpleMath;
+
+ID3D11Texture2D* g_BackBufferTexture;
+
+DirectX::SimpleMath::Matrix m_world;
+DirectX::SimpleMath::Matrix m_view;
+DirectX::SimpleMath::Matrix m_proj;
 
 // Render
 namespace Render
@@ -91,7 +98,6 @@ namespace Render
 // DirectX
 namespace DirectX
 {
-    static ID3D11DeviceContext* m_DeviceCtx = nullptr;
     static IDXGISwapChain* m_SwapChain = nullptr;
     static ID3D11RenderTargetView* m_RenderTargetView = nullptr;
 
@@ -114,26 +120,25 @@ namespace DirectX
             m_SwapChain = nullptr;
         }
 
-        if (m_DeviceCtx)
+        if (g_DeviceCtx)
         {
-            m_DeviceCtx->Release();
-            m_DeviceCtx = nullptr;
+            g_DeviceCtx->Release();
+            g_DeviceCtx = nullptr;
         }
 
-        if (m_DeviceCtx)
+        if (g_DeviceCtx)
         {
-            m_DeviceCtx->Release();
-            m_DeviceCtx = nullptr;
+            g_DeviceCtx->Release();
+            g_DeviceCtx = nullptr;
         }
     }
 
     void CreateRenderTarget()
     {
-        ID3D11Texture2D* m_BackBufferTexture;
-        m_SwapChain->GetBuffer(0, IID_PPV_ARGS(&m_BackBufferTexture));
+        m_SwapChain->GetBuffer(0, IID_PPV_ARGS(&g_BackBufferTexture));
 
-        g_Device->CreateRenderTargetView(m_BackBufferTexture, nullptr, &m_RenderTargetView);
-        m_BackBufferTexture->Release();
+        g_Device->CreateRenderTargetView(g_BackBufferTexture, nullptr, &m_RenderTargetView);
+        g_BackBufferTexture->Release();
     }
 
     bool CreateDevice(HWND p_Window)
@@ -157,7 +162,7 @@ namespace DirectX
 
         const D3D_FEATURE_LEVEL m_FeatureLevels[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0 };
         D3D_FEATURE_LEVEL m_FeatureLevelDummy;
-        HRESULT m_Result = D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, 0, m_FeatureLevels, ARRAYSIZE(m_FeatureLevels), D3D11_SDK_VERSION, &m_SwapChainDesc, &m_SwapChain, &g_Device, &m_FeatureLevelDummy, &m_DeviceCtx);
+        HRESULT m_Result = D3D11CreateDeviceAndSwapChain(0, D3D_DRIVER_TYPE_HARDWARE, 0, 0, m_FeatureLevels, ARRAYSIZE(m_FeatureLevels), D3D11_SDK_VERSION, &m_SwapChainDesc, &m_SwapChain, &g_Device, &m_FeatureLevelDummy, &g_DeviceCtx);
         if (m_Result != S_OK)
             return false;
 
@@ -250,8 +255,9 @@ LRESULT WINAPI WndProc(HWND p_HWND, UINT p_Msg, WPARAM p_WParam, LPARAM p_LParam
     return DefWindowProcA(p_HWND, p_Msg, p_WParam, p_LParam);
 }
 
-const char* g_DebugPermFilePath = R"(C:\Program Files (x86)\Steam\steamapps\common\SleepingDogsDefinitiveEdition\Game\Data\World\Game\Zone\SD\HK\HK.perm.bin)";
+std::unique_ptr<DirectX::GeometricPrimitive> m_shape;
 
+DirectX::GeometricPrimitive* g_pSphere = nullptr;
 // Main
 int WINAPI WinMain(HINSTANCE p_Instance, HINSTANCE p_PrevInstance, char* p_CmdLine, int p_CmdShow)
 {
@@ -269,10 +275,6 @@ int WINAPI WinMain(HINSTANCE p_Instance, HINSTANCE p_PrevInstance, char* p_CmdLi
         MessageBoxA(0, "Couldn't create window!", PROJECT_NAME, MB_OK | MB_ICONERROR);
         return 1;
     }
-
-#ifdef _DEBUG
-    g_Core.LoadPermFile(g_DebugPermFilePath, false);
-#endif
 
     if (!DirectX::CreateDevice(g_Window))
     {
@@ -299,7 +301,12 @@ int WINAPI WinMain(HINSTANCE p_Instance, HINSTANCE p_PrevInstance, char* p_CmdLi
     ImGui::InitializeFonts();
 
     ImGui_ImplWin32_Init(g_Window);
-    ImGui_ImplDX11_Init(g_Device, DirectX::m_DeviceCtx);
+    ImGui_ImplDX11_Init(g_Device, g_DeviceCtx);
+
+    // Create sphere
+    m_shape = GeometricPrimitive::CreateSphere(g_DeviceCtx);
+
+    m_world = Matrix::Identity;
 
     bool m_Quit = false;
     while (!m_Quit)
@@ -337,8 +344,20 @@ int WINAPI WinMain(HINSTANCE p_Instance, HINSTANCE p_PrevInstance, char* p_CmdLi
         }
         float m_TargetColorValueAbs = (0.025f + (fabsf(m_TargetColorValue) * 0.1f));
         float m_TargetColor[4] = { m_TargetColorValueAbs, m_TargetColorValueAbs, m_TargetColorValueAbs, 1.f };
-        DirectX::m_DeviceCtx->OMSetRenderTargets(1, &DirectX::m_RenderTargetView, nullptr);
-        DirectX::m_DeviceCtx->ClearRenderTargetView(DirectX::m_RenderTargetView, m_TargetColor);
+        g_DeviceCtx->OMSetRenderTargets(1, &DirectX::m_RenderTargetView, nullptr);
+        g_DeviceCtx->ClearRenderTargetView(DirectX::m_RenderTargetView, m_TargetColor);
+
+        // Set viewport
+        D3D11_VIEWPORT vp;
+        vp.Width = 1000;
+        vp.Height = 600;
+        vp.MinDepth = 0.0f;
+        vp.MaxDepth = 1.0f;
+        vp.TopLeftX = 0;
+        vp.TopLeftY = 0;
+        g_DeviceCtx->RSSetViewports(1, &vp);
+
+        m_shape->Draw(m_world, m_view, m_proj);
 
         ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
         DirectX::m_SwapChain->Present(1, 0);

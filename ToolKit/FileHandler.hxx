@@ -661,13 +661,14 @@ public:
         uint64_t topParent = FindTopParentID(chunkNode);
         if (topParent)
         {
-            printf("***** Top parent id: %d\n", topParent);
             ChunkNode* node = FindParentNode(topParent);
             if (node->chunk.uniqueID>0)
             {
-                printf("\t - Node id: %d\n", node->chunk.header.data_type);
+                // Apply the content for save the temp file
                 GetFileContent(g_FileHandler->m_LoadedFilePath, node->file_offset, node->chunk.header.sub_chunks_size);
                 SaveToTempFile("chunk.p3d", node->chunk.header.sub_chunks_size);
+                // Apply the content for the hex viewer
+                GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.sub_chunks_size);
                 P3DChunk* chunk = p3d.GetChunkByID(&p3d.chunks, topParent);
                 if (chunk != nullptr)
                 {
@@ -676,8 +677,8 @@ public:
                     LoadStream* stream = new LoadStream(path.c_str());
                     ChunkFile cf(stream, true);
                     loader = g_LoadManager->GetHandler(chunk->header.data_type);
-                    if (loader) {
-                        printf("***** Loading object id: %d - and render props of %d\n", chunk->header.data_type, chunkNode.chunk.uniqueID);
+                    if (loader) 
+                    {
                         loader->LoadObject(&cf);
                     }
                     stream->Close();
@@ -708,8 +709,6 @@ public:
                     chunkNode.IsSelected = true;
 
                     g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
-                    //GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.sub_chunks_size);
-                    //SaveToTempFile("chunk.p3d", chunkNode.chunk.header.sub_chunks_size);
                     LoadChunkContent(chunkNode);
                     m_selectedChunkNode = &chunkNode;
                 }
@@ -730,8 +729,6 @@ public:
                     chunkNode.IsSelected = true;
 
                     g_FileHandler->m_selectedFilePath = chunkNode.FullPath;
-                    //GetFileContent(g_FileHandler->m_LoadedFilePath, chunkNode.file_offset, chunkNode.chunk.header.sub_chunks_size);
-                    //SaveToTempFile("chunk.p3d", chunkNode.chunk.header.sub_chunks_size);
                     LoadChunkContent(chunkNode);
                     m_selectedChunkNode = &chunkNode;
                 }
@@ -783,22 +780,25 @@ public:
                 case eDisplayMode::DEFAULT:
                 {
                     ImGui::Text("DEFAULT-");
-                    break;
+                    if (loader) {
+                        loader->RenderObject(m_selectedChunkNode->chunk.header.data_type);
+                    }
                 }
+                    break;
                 case eDisplayMode::VALUES:
                 {
                     ImGui::Text("VALUES- %d", m_selectedChunkNode->chunk.header.data_type);
                     if (loader) {
                         loader->RenderObject(m_selectedChunkNode->chunk.header.data_type);
                     }
-                    break;
                 }
+                    break;
                 case eDisplayMode::HEX:
                 {
                     ImGui::Text("HEX-");
                     RenderHex();
-                    break;
                 }
+                    break;
             }
         }
     }

@@ -17,7 +17,12 @@
 #include <Windows.h>
 #include <d3d11.h>
 #include <sstream>
+#include <DirectXMath.h>
 #pragma comment(lib, "d3d11")
+
+#include <DirectXTK/SimpleMath.h>
+#include <DirectXTK/GeometricPrimitive.h>
+#pragma comment(lib, "DirectXTK")
 
 // Helpers
 #include "Helpers.hxx"
@@ -37,6 +42,7 @@ const char* g_HexEditorTitle = u8"\uE33B Hex Editor";
 HWND g_Window = nullptr;
 ImGuiIO* g_ImGuiIO = nullptr;
 static ID3D11Device* g_Device = nullptr;
+static ID3D11DeviceContext* g_DeviceCtx = nullptr;
 
 // File handler
 #include "FileHandler.hxx"

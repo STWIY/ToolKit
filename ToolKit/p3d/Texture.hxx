@@ -191,14 +191,22 @@ public:
 		if (texture == nullptr) return;
 		switch (type) {
 			case Texture::TEXTURE:
+			{
 				RenderTextureValues();
-				break;
-			case Texture::IMAGE:
-				RenderImageValues();
-				break;
-			case Texture::IMAGE_DATA:
 				RenderImage();
 				break;
+			}
+			case Texture::IMAGE:
+			{
+				RenderImageValues();
+				RenderImage();
+				break;
+			}
+			case Texture::IMAGE_DATA: 
+			{
+				RenderImage();
+				break;
+			}
 		}
 	}
 
