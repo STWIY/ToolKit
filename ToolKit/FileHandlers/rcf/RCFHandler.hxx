@@ -136,7 +136,6 @@ public:
             fileNode.FileType = GetFileTypeFromExtension(GetFileExtension(filenameEntry.path));
             fileNode.IsDirectory = false;
             fileNode.entry = &filenameEntry;
-            fileNode.dir_entry = GetDirectoryEntry(rcf, filenameEntry.path);
             currentNode->Children.push_back(fileNode);
         }
     }
@@ -183,6 +182,7 @@ public:
             ImGuiTreeNodeFlags m_TreeNodeFlags = IMGUI_TREENODE_FLAGS;
             if (m_NodeSelected == parentNode)
                 m_TreeNodeFlags |= ImGuiTreeNodeFlags_Selected;
+
             if (parentNode->IsDirectory)
             {
                 if (ImGui::TreeNodeEx(parentNode->FileName.c_str(), m_TreeNodeFlags))
@@ -203,30 +203,31 @@ public:
                         GetFileInformation(g_FileHandler->m_selectedFilePath);
                     }
                 }
-            }
 
-            if (ImGui_ToolTipHover())
-            {
-                std::pair<const char*, std::string> m_ResourceInfoList[] =
+                if (ImGui_ToolTipHover())
                 {
-                    { "Name",          parentNode->FileName },
-                    { "Path",          parentNode->FullPath },
-                    { "Type",          GetFileExtensionFromType(parentNode->FileType) },
-                    { "Date",          (parentNode->entry) ? TimestampToString(parentNode->entry->date) : "-" },
-                    { "Size",          (parentNode->dir_entry) ? std::to_string(parentNode->dir_entry->fl_size) : "-" }
-                };
+                    parentNode->dir_entry = GetDirectoryEntry(rcf, parentNode->FullPath);
+                    std::pair<const char*, std::string> m_ResourceInfoList[] =
+                    {
+                        { "Name",          parentNode->FileName },
+                        { "Path",          parentNode->FullPath },
+                        { "Type",          GetFileExtensionFromType(parentNode->FileType) },
+                        { "Date",          (parentNode->entry) ? TimestampToString(parentNode->entry->date) : "-" },
+                        { "Size",          (parentNode->dir_entry) ? std::to_string(parentNode->dir_entry->fl_size) : "-" },
+                    };
 
-                // Loop through the m_ResourceInfoList array
-                for (auto& m_Pair : m_ResourceInfoList)
-                {
-                    ImGui::Text("%s:", m_Pair.first);
-                    ImGui::SameLine(80.f);
-                    ImGui::PushStyleColor(ImGuiCol_Text, IMGUI_COLOR_TEXT2);
-                    ImGui::Text(&m_Pair.second[0]);
-                    ImGui::PopStyleColor();
+                    // Loop through the m_ResourceInfoList array
+                    for (auto& m_Pair : m_ResourceInfoList)
+                    {
+                        ImGui::Text("%s:", m_Pair.first);
+                        ImGui::SameLine(80.f);
+                        ImGui::PushStyleColor(ImGuiCol_Text, IMGUI_COLOR_TEXT2);
+                        ImGui::Text(&m_Pair.second[0]);
+                        ImGui::PopStyleColor();
+                    }
+
+                    ImGui::EndTooltip();
                 }
-
-                ImGui::EndTooltip();
             }
 
             // Mark node as selected
@@ -247,10 +248,13 @@ public:
     {
         if (m_NodeSelected)
         {
-            if (m_NodeSelected->entry != nullptr) 
+            if (m_NodeSelected->entry != nullptr)
             {
                 ImGui::Text(m_NodeSelected->entry->path.c_str());
-                //ImGui::Text(m_NodeSelected->dir_entry->fl_size);
+            }
+            if (m_NodeSelected->dir_entry != nullptr)
+            {
+                ImGui::Text("%d", m_NodeSelected->dir_entry->fl_size);
             }
         }
     }
