@@ -42,3 +42,17 @@ struct RCF {
     std::vector<RCFDirectoryEntry> directory;
     std::vector<RCFFilenameDirectoryEntry> filename_directory;
 };
+
+
+RCFDirectoryEntry* GetDirectoryEntry(RCF rcf, std::string path)
+{
+    int index = 0;
+    for (auto& filenameEntry : rcf.filename_directory) {
+        if (filenameEntry.path == path)
+        {
+            return &rcf.directory[index];
+        }
+        index++;
+    }
+    return NULL;
+}

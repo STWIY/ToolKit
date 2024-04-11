@@ -4,7 +4,7 @@
 #include <vector>
 #include <cstdio>
 
-#include "ChunkFile.hxx"
+#include "pure3d/ChunkFile.hxx"
 
 #pragma pack(push, 1)
 

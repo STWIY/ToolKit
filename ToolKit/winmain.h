@@ -2,6 +2,8 @@
 
 #define _CRT_SECURE_NO_WARNINGS
 
+#include "Console.hxx"
+
 // 3rdParty (Half-Float)
 #include "3rdParty/umHalf.h"
 
@@ -18,6 +20,10 @@
 #include <d3d11.h>
 #include <sstream>
 #pragma comment(lib, "d3d11")
+
+//#include <DirectXTK/SimpleMath.h>
+//#include <DirectXTK/GeometricPrimitive.h>
+//#pragma comment(lib, "DirectXTK")
 
 // Helpers
 #include "Helpers.hxx"
@@ -37,15 +43,17 @@ const char* g_HexEditorTitle = u8"\uE33B Hex Editor";
 HWND g_Window = nullptr;
 ImGuiIO* g_ImGuiIO = nullptr;
 static ID3D11Device* g_Device = nullptr;
-
-// File handler
-#include "FileHandler.hxx"
+static ID3D11DeviceContext* g_DeviceCtx = nullptr;
 
 // Defines
 #define PROJECT_NAME        "Scarface Tool"
 
+#define IMGUI_COLOR_TEXT2               IM_COL32(150, 150, 150, 255)
+#define IMGUI_TREENODE_FLAGS            (ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_OpenOnArrow)
+#define IMGUI_TREENODE_OPEN_FLAGS       (IMGUI_TREENODE_FLAGS | ImGuiTreeNodeFlags_DefaultOpen)
+
 // Resources
 #include "Resource.h"
-#include "FontAwesome.hxx"
+#include "UI/FontAwesome.hxx"
 
 int WINAPI WinMain(HINSTANCE instance, HINSTANCE, LPSTR, int cmdShow);

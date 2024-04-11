@@ -148,7 +148,7 @@
     <ClCompile Include="3rdParty\ImGui\imgui_impl_win32.cpp" />
     <ClCompile Include="3rdParty\ImGui\imgui_tables.cpp" />
     <ClCompile Include="3rdParty\ImGui\imgui_widgets.cpp" />
-    <ClCompile Include="p3d\lodepng\lodepng.cpp" />
+    <ClCompile Include="FileHandlers\p3d\pure3d\lodepng\lodepng.cpp" />
     <ClCompile Include="WinMain.cc" />
   </ItemGroup>
   <ItemGroup>
@@ -162,21 +162,26 @@
     <ClInclude Include="3rdParty\ImGui\imstb_textedit.h" />
     <ClInclude Include="3rdParty\ImGui\imstb_truetype.h" />
     <ClInclude Include="Console.hxx" />
-    <ClInclude Include="FileHandler.hxx" />
-    <ClInclude Include="FontAwesome.hxx" />
+    <ClInclude Include="FileHandlers\bik\BIKHandler.hxx" />
+    <ClInclude Include="FileHandlers\cso\CSOHandler.hxx" />
+    <ClInclude Include="FileHandlers\FileHandler.hxx" />
+    <ClInclude Include="FileHandlers\p3d\P3D.h" />
+    <ClInclude Include="FileHandlers\p3d\P3DHandler.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\ChunkFile.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\ComposeiteDrawable.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\Geometry.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\LoadManager.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\LoadStream.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\lodepng\lodepng.h" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\Shader.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\Skeleton.hxx" />
+    <ClInclude Include="FileHandlers\p3d\pure3d\Texture.hxx" />
+    <ClInclude Include="FileHandlers\rcf\RCF.h" />
+    <ClInclude Include="FileHandlers\rcf\RCFHandler.hxx" />
     <ClInclude Include="Helpers.hxx" />
-    <ClInclude Include="p3d\ChunkFile.hxx" />
-    <ClInclude Include="p3d\ComposeiteDrawable.hxx" />
-    <ClInclude Include="p3d\Geometry.hxx" />
-    <ClInclude Include="p3d\LoadManager.hxx" />
-    <ClInclude Include="p3d\LoadStream.hxx" />
-    <ClInclude Include="p3d\lodepng\lodepng.h" />
-    <ClInclude Include="p3d\P3D.h" />
-    <ClInclude Include="p3d\Shader.hxx" />
-    <ClInclude Include="p3d\Skeleton.hxx" />
-    <ClInclude Include="p3d\Texture.hxx" />
-    <ClInclude Include="RCF.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="UI.hxx" />
+    <ClInclude Include="UI\FontAwesome.hxx" />
     <ClInclude Include="WinMain.h" />
   </ItemGroup>
   <ItemGroup>

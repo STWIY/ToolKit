@@ -7,11 +7,29 @@
     <Filter Include="Project Files\3rdParty">
       <UniqueIdentifier>{0ea7a4c9-e33d-4bdd-9dd1-660975cf3ee5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Project Files\p3d">
+    <Filter Include="Project Files\FileHandlers">
+      <UniqueIdentifier>{bb837073-3921-419a-a79f-043088eb5f4c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\FileHandlers\p3d">
       <UniqueIdentifier>{c5841470-3f13-4453-95c3-b53bece54aa3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Project Files\p3d\lodepng">
-      <UniqueIdentifier>{7d326a09-ae96-4639-a4d0-254888a1c343}</UniqueIdentifier>
+    <Filter Include="Project Files\UI">
+      <UniqueIdentifier>{e4031613-5dd7-44b2-b46e-53db738d41c7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\FileHandlers\rcf">
+      <UniqueIdentifier>{4783457a-8c19-4fb0-b0b3-e1708dc33ef6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\FileHandlers\p3d\pure3d">
+      <UniqueIdentifier>{53c3d52c-b31a-46cd-9e05-35523f0d6be2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\FileHandlers\p3d\pure3d\lodepng">
+      <UniqueIdentifier>{a4baf662-8a47-433b-9307-c5c706a28b3d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\FileHandlers\cso">
+      <UniqueIdentifier>{97e82ee5-202f-46fa-b3aa-b457d4ac3e50}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Project Files\FileHandlers\bik">
+      <UniqueIdentifier>{3126b526-817e-4aca-b043-451a9381b629}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -36,8 +54,8 @@
     <ClCompile Include="3rdParty\ImGui\imgui_widgets.cpp">
       <Filter>Project Files\3rdParty</Filter>
     </ClCompile>
-    <ClCompile Include="p3d\lodepng\lodepng.cpp">
-      <Filter>Project Files\p3d\lodepng</Filter>
+    <ClCompile Include="FileHandlers\p3d\pure3d\lodepng\lodepng.cpp">
+      <Filter>Project Files\FileHandlers\p3d\pure3d\lodepng</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -71,53 +89,68 @@
     <ClInclude Include="3rdParty\ImGui\imstb_truetype.h">
       <Filter>Project Files\3rdParty</Filter>
     </ClInclude>
-    <ClInclude Include="FileHandler.hxx">
-      <Filter>Project Files</Filter>
-    </ClInclude>
-    <ClInclude Include="RCF.h">
-      <Filter>Project Files</Filter>
-    </ClInclude>
     <ClInclude Include="Helpers.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="p3d\ChunkFile.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\ComposeiteDrawable.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\Geometry.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\P3D.h">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\Shader.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\Skeleton.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\Texture.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\LoadManager.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
-    <ClInclude Include="p3d\LoadStream.hxx">
-      <Filter>Project Files\p3d</Filter>
-    </ClInclude>
     <ClInclude Include="Console.hxx">
-      <Filter>Project Files</Filter>
-    </ClInclude>
-    <ClInclude Include="FontAwesome.hxx">
       <Filter>Project Files</Filter>
     </ClInclude>
     <ClInclude Include="Resource.h">
       <Filter>Project Files</Filter>
     </ClInclude>
-    <ClInclude Include="p3d\lodepng\lodepng.h">
-      <Filter>Project Files\p3d\lodepng</Filter>
+    <ClInclude Include="UI.hxx">
+      <Filter>Project Files\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\FileHandler.hxx">
+      <Filter>Project Files\FileHandlers</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\FontAwesome.hxx">
+      <Filter>Project Files\UI</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\P3D.h">
+      <Filter>Project Files\FileHandlers\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\rcf\RCF.h">
+      <Filter>Project Files\FileHandlers\rcf</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\P3DHandler.hxx">
+      <Filter>Project Files\FileHandlers\p3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\rcf\RCFHandler.hxx">
+      <Filter>Project Files\FileHandlers\rcf</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\ChunkFile.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\ComposeiteDrawable.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\Geometry.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\LoadManager.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\LoadStream.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\Shader.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\Skeleton.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\Texture.hxx">
+      <Filter>Project Files\FileHandlers\p3d\pure3d</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\p3d\pure3d\lodepng\lodepng.h">
+      <Filter>Project Files\FileHandlers\p3d\pure3d\lodepng</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\bik\BIKHandler.hxx">
+      <Filter>Project Files\FileHandlers\bik</Filter>
+    </ClInclude>
+    <ClInclude Include="FileHandlers\cso\CSOHandler.hxx">
+      <Filter>Project Files\FileHandlers\cso</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
